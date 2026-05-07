@@ -9,7 +9,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "doctor": "expo doctor",
+    "expo:check": "expo install --check",
+    "expo:fix": "expo install --fix"
   },
   "dependencies": {
     "@expo/vector-icons": "latest",
@@ -17,7 +20,6 @@
     "@hookform/resolvers": "latest",
     "@react-navigation/native": "latest",
     "@supabase/supabase-js": "latest",
-    "react-native-url-polyfill": "latest",
     "@tanstack/react-query": "latest",
     "dayjs": "latest",
     "expo": "latest",
@@ -38,6 +40,7 @@
     "react-native-reanimated": "latest",
     "react-native-safe-area-context": "latest",
     "react-native-screens": "latest",
+    "react-native-url-polyfill": "latest",
     "zod": "latest",
     "zustand": "latest"
   },
