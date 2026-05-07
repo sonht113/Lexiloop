@@ -3,6 +3,9 @@
 create extension if not exists pgcrypto;
 create extension if not exists citext;
 
+create schema if not exists private;
+revoke all on schema private from public;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username citext not null unique,
@@ -77,19 +80,47 @@ alter table public.words enable row level security;
 alter table public.review_logs enable row level security;
 alter table public.reminder_settings enable row level security;
 
-create policy "profiles owner" on public.profiles for all using (id = auth.uid()) with check (id = auth.uid());
-create policy "decks owner" on public.decks for all using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy "words owner with owned deck" on public.words for all
-  using (user_id = auth.uid() and exists (select 1 from public.decks d where d.id = deck_id and d.user_id = auth.uid()))
-  with check (user_id = auth.uid() and exists (select 1 from public.decks d where d.id = deck_id and d.user_id = auth.uid()));
-create policy "review logs owner" on public.review_logs for select using (user_id = auth.uid());
-create policy "reminder owner" on public.reminder_settings for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "profiles owner" on public.profiles
+  for all to authenticated
+  using (id = (select auth.uid()))
+  with check (id = (select auth.uid()));
 
-create or replace function public.answer_word_review(p_word_id uuid, p_result text)
+create policy "decks owner" on public.decks
+  for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+create policy "words owner with owned deck" on public.words for all
+  to authenticated
+  using (
+    user_id = (select auth.uid())
+    and exists (
+      select 1 from public.decks d
+      where d.id = deck_id and d.user_id = (select auth.uid())
+    )
+  )
+  with check (
+    user_id = (select auth.uid())
+    and exists (
+      select 1 from public.decks d
+      where d.id = deck_id and d.user_id = (select auth.uid())
+    )
+  );
+
+create policy "review logs owner" on public.review_logs
+  for select to authenticated
+  using (user_id = (select auth.uid()));
+
+create policy "reminder owner" on public.reminder_settings
+  for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+create or replace function private.answer_word_review(p_word_id uuid, p_result text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, private
 as $$
 declare
   v_word public.words%rowtype;
@@ -137,4 +168,13 @@ begin
 
   return jsonb_build_object('ok', true, 'word_id', p_word_id, 'result', p_result, 'interval_days', v_interval);
 end;
+$$;
+
+create or replace function public.answer_word_review(p_word_id uuid, p_result text)
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.answer_word_review(p_word_id, p_result);
 $$;

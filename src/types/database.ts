@@ -19,6 +19,7 @@ export type Database = {
           timezone?: string;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Relationships: [];
       };
       decks: {
         Row: {
@@ -39,6 +40,7 @@ export type Database = {
           color?: string | null;
         };
         Update: Partial<Database['public']['Tables']['decks']['Insert']>;
+        Relationships: [];
       };
       words: {
         Row: {
@@ -72,6 +74,15 @@ export type Database = {
           due_at?: string;
         };
         Update: Partial<Database['public']['Tables']['words']['Insert']>;
+        Relationships: [
+          {
+            foreignKeyName: 'words_deck_id_fkey';
+            columns: ['deck_id'];
+            isOneToOne: false;
+            referencedRelation: 'decks';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       review_logs: {
         Row: {
@@ -89,6 +100,22 @@ export type Database = {
           result: ReviewResult;
         };
         Update: never;
+        Relationships: [
+          {
+            foreignKeyName: 'review_logs_deck_id_fkey';
+            columns: ['deck_id'];
+            isOneToOne: false;
+            referencedRelation: 'decks';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'review_logs_word_id_fkey';
+            columns: ['word_id'];
+            isOneToOne: false;
+            referencedRelation: 'words';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       reminder_settings: {
         Row: {
@@ -108,12 +135,15 @@ export type Database = {
           message?: string;
         };
         Update: Partial<Database['public']['Tables']['reminder_settings']['Insert']>;
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
     Functions: {
       get_profile_stats: {
         Args: Record<string, never>;
         Returns: {
+          due_count: number;
           total_words: number;
           mastered_words: number;
           total_reviews: number;

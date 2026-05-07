@@ -1,13 +1,14 @@
 -- Stats and streak helper functions for LexiLoop MVP.
 
-create or replace function public.get_profile_stats()
+create or replace function private.get_profile_stats()
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, private
 as $$
 declare
   v_total_words int;
+  v_due_words int;
   v_mastered_words int;
   v_total_reviews int;
   v_remembered_reviews int;
@@ -21,6 +22,7 @@ begin
   v_timezone := coalesce(v_timezone, 'Asia/Ho_Chi_Minh');
 
   select count(*) into v_total_words from public.words where user_id = auth.uid();
+  select count(*) into v_due_words from public.words where user_id = auth.uid() and due_at <= now();
   select count(*) into v_mastered_words from public.words where user_id = auth.uid() and correct_streak >= 5;
   select count(*) into v_total_reviews from public.review_logs where user_id = auth.uid();
   select count(*) into v_remembered_reviews from public.review_logs where user_id = auth.uid() and result = 'remembered';
@@ -42,6 +44,7 @@ begin
   end loop;
 
   return jsonb_build_object(
+    'due_count', v_due_words,
     'total_words', v_total_words,
     'mastered_words', v_mastered_words,
     'total_reviews', v_total_reviews,
@@ -49,4 +52,13 @@ begin
     'current_streak', v_streak
   );
 end;
+$$;
+
+create or replace function public.get_profile_stats()
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$
+  select private.get_profile_stats();
 $$;

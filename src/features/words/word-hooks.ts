@@ -19,7 +19,7 @@ export function useWordQuery(wordId?: string) {
     queryKey: ['words', 'detail', wordId],
     enabled: Boolean(wordId),
     queryFn: async () => {
-      const { data, error } = await supabase.from('words').select('*').eq('id', wordId).single();
+      const { data, error } = await supabase.from('words').select('*').eq('id', wordId!).single();
       if (error) throw error;
       return data;
     },

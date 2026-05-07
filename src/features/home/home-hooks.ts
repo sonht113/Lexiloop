@@ -8,7 +8,7 @@ export function useHomeStatsQuery() {
       const { data, error } = await supabase.rpc('get_profile_stats');
       if (error) throw error;
       return {
-        dueCount: 0,
+        dueCount: data.due_count,
         totalWords: data.total_words,
         masteredWords: data.mastered_words,
         totalReviews: data.total_reviews,

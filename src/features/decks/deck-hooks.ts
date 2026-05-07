@@ -17,7 +17,7 @@ export function useDeckQuery(deckId?: string) {
     queryKey: ['decks', deckId],
     enabled: Boolean(deckId),
     queryFn: async () => {
-      const { data, error } = await supabase.from('decks').select('*').eq('id', deckId).single();
+      const { data, error } = await supabase.from('decks').select('*').eq('id', deckId!).single();
       if (error) throw error;
       return data;
     },
