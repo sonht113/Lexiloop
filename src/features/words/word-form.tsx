@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, View } from 'react-native';
-import { Button, FormInput } from '@/components/ui';
+import { Button, EmptyState, FieldError, FormInput } from '@/components/ui';
 import { DeckSelector } from '@/features/decks/deck-selector';
 import { useDecksQuery } from '@/features/decks/deck-hooks';
 import { useCreateWordMutation, useUpdateWordMutation } from './word-hooks';
@@ -34,7 +34,14 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
     },
   });
 
+  const selectedDeckId = form.watch('deck_id');
   const wordValue = form.watch('word');
+
+  useEffect(() => {
+    if (selectedDeckId || !decks.data?.length) return;
+    const fallbackDeck = defaultDeckId && decks.data.some((deck) => deck.id === defaultDeckId) ? defaultDeckId : decks.data[0].id;
+    form.setValue('deck_id', fallbackDeck, { shouldValidate: true });
+  }, [decks.data, defaultDeckId, form, selectedDeckId]);
 
   useEffect(() => {
     if (isEditing) return;
@@ -89,12 +96,10 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
     <View className="gap-4">
       <Controller control={form.control} name="deck_id" render={({ field, fieldState }) => (
         <View className="gap-2">
-          {decks.data?.length ? (
-            <DeckSelector decks={decks.data} value={field.value} onChange={field.onChange} />
-          ) : (
-            <FormInput label="Deck ID" placeholder="Default deck id" value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
-          )}
-          {fieldState.error?.message ? <FormInput label="" editable={false} value={fieldState.error.message} /> : null}
+          {decks.isLoading ? <FormInput label="Deck" editable={false} value="Loading decks..." /> : null}
+          {!decks.isLoading && decks.data?.length ? <DeckSelector decks={decks.data} value={field.value} onChange={field.onChange} /> : null}
+          {!decks.isLoading && decks.data?.length === 0 ? <EmptyState title="No deck available" description="Create a deck before adding words." /> : null}
+          <FieldError message={fieldState.error?.message} />
         </View>
       )} />
       <Controller control={form.control} name="word" render={({ field, fieldState }) => (
@@ -110,8 +115,8 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
         <FormInput label="Note" placeholder="Optional note" multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
       )} />
       <FormInput label="Pronunciation" editable={false} value={pronunciationState === 'loading' ? 'Fetching pronunciation...' : form.watch('phonetic') || 'No pronunciation yet'} />
-      <Button title={isSaving ? 'Saving...' : isEditing ? 'Save Word' : 'Save'} disabled={isSaving} onPress={submit('done')} />
-      {!isEditing ? <Button title="Save & add another" variant="secondary" disabled={isSaving} onPress={submit('again')} /> : null}
+      <Button title={isSaving ? 'Saving...' : isEditing ? 'Save Word' : 'Save'} disabled={isSaving || decks.data?.length === 0} onPress={submit('done')} />
+      {!isEditing ? <Button title="Save & add another" variant="secondary" disabled={isSaving || decks.data?.length === 0} onPress={submit('again')} /> : null}
     </View>
   );
 }

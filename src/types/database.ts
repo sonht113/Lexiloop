@@ -111,6 +111,16 @@ export type Database = {
       };
     };
     Functions: {
+      get_profile_stats: {
+        Args: Record<string, never>;
+        Returns: {
+          total_words: number;
+          mastered_words: number;
+          total_reviews: number;
+          accuracy: number | null;
+          current_streak: number;
+        };
+      };
       answer_word_review: {
         Args: { p_word_id: string; p_result: ReviewResult };
         Returns: Json;

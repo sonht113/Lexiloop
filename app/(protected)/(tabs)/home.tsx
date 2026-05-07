@@ -25,7 +25,7 @@ export default function HomeScreen() {
         </View>
         <View className="flex-row gap-3">
           <Card className="flex-1"><AppText className="text-2xl font-bold">{stats.data?.accuracy ?? '—'}{stats.data?.accuracy != null ? '%' : ''}</AppText><AppText className="text-muted">Accuracy</AppText></Card>
-          <Card className="flex-1"><AppText className="text-2xl font-bold">20:00</AppText><AppText className="text-muted">Reminder</AppText></Card>
+          <Card className="flex-1"><AppText className="text-2xl font-bold">{stats.data?.currentStreak ?? '—'}</AppText><AppText className="text-muted">Streak</AppText></Card>
         </View>
       </ScrollView>
     </Screen>
