@@ -1,0 +1,50 @@
+{
+  "name": "lexiloop-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "latest",
+    "@gorhom/bottom-sheet": "latest",
+    "@hookform/resolvers": "latest",
+    "@react-navigation/native": "latest",
+    "@supabase/supabase-js": "latest",
+    "react-native-url-polyfill": "latest",
+    "@tanstack/react-query": "latest",
+    "dayjs": "latest",
+    "expo": "latest",
+    "expo-av": "latest",
+    "expo-constants": "latest",
+    "expo-linking": "latest",
+    "expo-notifications": "latest",
+    "expo-router": "latest",
+    "expo-secure-store": "latest",
+    "expo-splash-screen": "latest",
+    "expo-status-bar": "latest",
+    "lucide-react-native": "latest",
+    "nativewind": "latest",
+    "react": "latest",
+    "react-hook-form": "latest",
+    "react-native": "latest",
+    "react-native-gesture-handler": "latest",
+    "react-native-reanimated": "latest",
+    "react-native-safe-area-context": "latest",
+    "react-native-screens": "latest",
+    "zod": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@babel/core": "latest",
+    "@types/react": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest"
+  }
+}

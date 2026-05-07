@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "LexiLoop",
+    "slug": "lexiloop",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "lexiloop",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6366F1"
+      }
+    }
+  }
+}
