@@ -1,39 +1,308 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
+import { createAudioPlayer } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { AppText, Button, Card, Screen } from '@/components/ui';
-import { useAnswerWordReviewMutation, useDueWordsQuery } from '@/features/review/review-hooks';
-import type { Database } from '@/types/database';
+import { CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, Flame, RotateCcw, Volume2, X } from 'lucide-react-native';
+import { AppText, Button, Card, Screen, useAppAlert } from '@/components/ui';
+import { useHomeStatsQuery } from '@/features/home/home-hooks';
+import { useAnswerWordReviewMutation, useDueWordsQuery, type ReviewWord } from '@/features/review/review-hooks';
+import { useAppTheme } from '@/lib/theme-provider';
 
-type Word = Database['public']['Tables']['words']['Row'];
+type ReviewExample = {
+  id: string;
+  sentence: string;
+  translation: string | null;
+  sort_order: number;
+};
+
+type SessionSummary = {
+  forgot: number;
+  remembered: number;
+  mastered: number;
+};
+
+function getExamples(word: ReviewWord): ReviewExample[] {
+  const examples = (word.word_examples ?? [])
+    .slice()
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((example) => ({
+      id: example.id,
+      sentence: example.sentence,
+      translation: example.translation,
+      sort_order: example.sort_order,
+    }));
+
+  if (examples.length > 0) return examples.slice(0, 3);
+  if (word.example) return [{ id: `${word.id}-legacy-example`, sentence: word.example, translation: null, sort_order: 0 }];
+  return [];
+}
+
+async function playPronunciation(audioUrl?: string | null) {
+  if (!audioUrl) return;
+  try {
+    const player = createAudioPlayer(audioUrl);
+    const subscription = player.addListener('playbackStatusUpdate', (status) => {
+      if (!status.didJustFinish) return;
+      subscription.remove();
+      player.remove();
+    });
+    player.play();
+  } catch {
+    throw new Error('Could not play pronunciation for this word.');
+  }
+}
+
+function SpeakerButton({ audioUrl, compact = false }: { audioUrl?: string | null; compact?: boolean }) {
+  const { colors } = useAppTheme();
+  const appAlert = useAppAlert();
+
+  if (!audioUrl) return null;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Play pronunciation"
+      className={`${compact ? 'h-9 w-9' : 'h-12 w-12'} items-center justify-center rounded-full`}
+      style={{ backgroundColor: colors.primarySoft }}
+      onPress={() => {
+        void playPronunciation(audioUrl).catch((error) => {
+          appAlert.show({ title: 'Audio unavailable', message: error instanceof Error ? error.message : 'Please try again.', variant: 'warning' });
+        });
+      }}
+    >
+      <Volume2 color={colors.primary} size={compact ? 18 : 22} />
+    </Pressable>
+  );
+}
+
+function FlashcardFront({ word, modeLabel, onReveal }: { word: ReviewWord; modeLabel: string; onReveal: () => void }) {
+  const { colors } = useAppTheme();
+
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Reveal word meaning" onPress={onReveal}>
+      <Card className="min-h-[542px] justify-between overflow-hidden border px-7 py-8" style={{ borderColor: colors.border }}>
+        <View className="items-center gap-3">
+          <AppText className="rounded-full px-4 py-2 text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: colors.primarySoft, color: colors.primary }}>
+            {word.decks?.name ?? modeLabel}
+          </AppText>
+          <AppText className="text-center text-sm font-medium" style={{ color: colors.muted }}>Review card</AppText>
+        </View>
+
+        <View className="items-center gap-5">
+          <View className="h-24 w-24 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySoft }}>
+            <AppText className="text-5xl font-bold" style={{ color: colors.primary }}>{word.word.slice(0, 1).toUpperCase()}</AppText>
+          </View>
+          <View className="items-center gap-3">
+            <AppText className="text-center text-5xl font-bold leading-[58px]" style={{ color: colors.text }}>{word.word}</AppText>
+            {word.phonetic ? <AppText className="text-center text-lg" style={{ color: colors.muted }}>{word.phonetic}</AppText> : null}
+          </View>
+          <SpeakerButton audioUrl={word.audio_url} />
+        </View>
+
+        <View className="items-center gap-2">
+          <AppText className="text-center text-base font-semibold" style={{ color: colors.text }}>Tap to reveal</AppText>
+          <AppText className="text-center text-sm" style={{ color: colors.muted }}>Check the meaning when you are ready.</AppText>
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
+
+function FlashcardBack({
+  word,
+  examplesExpanded,
+  onToggleExamples,
+  onReturnFront,
+}: {
+  word: ReviewWord;
+  examplesExpanded: boolean;
+  onToggleExamples: () => void;
+  onReturnFront: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const examples = getExamples(word);
+  const visibleExamples = examplesExpanded ? examples : examples.slice(0, 2);
+  const canExpand = examples.length > 2;
+
+  return (
+    <Card className="max-h-[542px] overflow-hidden border p-0" style={{ borderColor: colors.border }}>
+      <View className="flex-row items-center justify-between border-b px-6 py-4" style={{ backgroundColor: colors.primarySoft, borderColor: colors.border }}>
+        <View className="flex-1 pr-3">
+          <AppText className="text-2xl font-bold" style={{ color: colors.text }}>{word.word}</AppText>
+          {word.phonetic ? <AppText className="mt-1" style={{ color: colors.muted }}>{word.phonetic}</AppText> : null}
+        </View>
+        <View className="flex-row items-center gap-2">
+          <SpeakerButton audioUrl={word.audio_url} compact />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Return to word side"
+            className="h-9 w-9 items-center justify-center rounded-full"
+            style={{ backgroundColor: colors.surface }}
+            onPress={onReturnFront}
+          >
+            <RotateCcw color={colors.primary} size={18} />
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView className="max-h-[410px]" contentContainerClassName="gap-5 px-6 py-6" showsVerticalScrollIndicator={false}>
+        <View className="gap-2">
+          <AppText className="text-xs font-bold uppercase tracking-widest" style={{ color: colors.primary }}>Meaning</AppText>
+          <AppText className="text-xl font-semibold leading-7" style={{ color: colors.text }}>{word.meaning}</AppText>
+        </View>
+
+        {examples.length > 0 ? (
+          <View className="gap-3">
+            <View className="flex-row items-center justify-between">
+              <AppText className="text-xs font-bold uppercase tracking-widest" style={{ color: colors.primary }}>Examples</AppText>
+              {canExpand ? (
+                <Pressable accessibilityRole="button" className="flex-row items-center gap-1" onPress={onToggleExamples}>
+                  <AppText className="text-sm font-semibold" style={{ color: colors.primary }}>{examplesExpanded ? 'Show less' : 'Show all'}</AppText>
+                  {examplesExpanded ? <ChevronUp color={colors.primary} size={16} /> : <ChevronDown color={colors.primary} size={16} />}
+                </Pressable>
+              ) : null}
+            </View>
+            {visibleExamples.map((example, index) => (
+              <View key={example.id} className="gap-2 rounded-2xl p-4" style={{ backgroundColor: colors.canvas }}>
+                <AppText className="text-xs font-semibold" style={{ color: colors.muted }}>Example {index + 1}</AppText>
+                <AppText className="text-base leading-6" style={{ color: colors.text }}>{`"${example.sentence}"`}</AppText>
+                {example.translation ? <AppText className="text-sm leading-5" style={{ color: colors.muted }}>{example.translation}</AppText> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {word.note ? (
+          <View className="gap-2 rounded-2xl border p-4" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+            <AppText className="text-xs font-bold uppercase tracking-widest" style={{ color: colors.primary }}>Context</AppText>
+            <AppText className="text-sm leading-6" style={{ color: colors.muted }}>{word.note}</AppText>
+          </View>
+        ) : null}
+      </ScrollView>
+    </Card>
+  );
+}
+
+function SummaryRow({ icon, label, value, valueColor }: { icon: ReactNode; label: string; value: number; valueColor?: string }) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View className="min-h-[40px] flex-row items-center justify-between border-b py-2 last:border-b-0" style={{ borderColor: colors.border }}>
+      <View className="flex-row items-center gap-3">
+        {icon}
+        <AppText className="text-base font-medium leading-6" style={{ color: colors.muted }}>{label}</AppText>
+      </View>
+      <AppText className="text-base font-medium leading-6" style={{ color: valueColor ?? colors.text }}>{value}</AppText>
+    </View>
+  );
+}
+
+function ReviewDoneScreen({
+  summary,
+  currentStreak,
+  onBackHome,
+  onAddNewWord,
+}: {
+  summary: SessionSummary;
+  currentStreak?: number;
+  onBackHome: () => void;
+  onAddNewWord: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const reviewed = summary.forgot + summary.remembered;
+  const streakLabel = typeof currentStreak === 'number' ? `${currentStreak} day streak` : '-- day streak';
+
+  return (
+    <Screen className="px-5" style={{ backgroundColor: colors.canvas }}>
+      <ScrollView contentContainerClassName="min-h-full justify-between pb-6 pt-4" showsVerticalScrollIndicator={false}>
+        <View>
+          <View className="items-center pt-2">
+            <View className="mb-4 h-24 w-24 items-center justify-center rounded-full shadow-sm" style={{ backgroundColor: colors.primarySoft }}>
+              <CheckCircle2 color={colors.success} size={40} strokeWidth={2.5} />
+            </View>
+            <AppText className="text-center text-[32px] font-bold leading-10" style={{ color: colors.text }}>All done for today</AppText>
+            <AppText className="mt-4 text-center text-base leading-6" style={{ color: colors.muted }}>Great job. Come back tomorrow.</AppText>
+          </View>
+
+          <View className="mt-8 gap-4">
+            <Card className="rounded-xl border p-6 shadow-none" style={{ borderColor: colors.border }}>
+              <AppText className="mb-2 text-lg font-semibold leading-6" style={{ color: colors.text }}>Session Summary</AppText>
+              <SummaryRow icon={<ClipboardCheck color={colors.muted} size={18} strokeWidth={2.4} />} label="Reviewed" value={reviewed} />
+              <SummaryRow icon={<CheckCircle2 color={colors.success} size={18} strokeWidth={2.4} />} label="Remembered" value={summary.remembered} valueColor={colors.success} />
+              <SummaryRow icon={<CheckCircle2 color={colors.success} size={18} strokeWidth={2.4} />} label="Mastered today" value={summary.mastered} valueColor={colors.success} />
+              <SummaryRow icon={<Flame color={colors.warning} fill={colors.warning} size={19} strokeWidth={2.2} />} label="Need practice" value={summary.forgot} valueColor={colors.warning} />
+            </Card>
+
+            <View className="min-h-[98px] flex-row items-center rounded-xl border px-6 py-6" style={{ backgroundColor: colors.primarySoft, borderColor: colors.border }}>
+              <View className="h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: colors.surface }}>
+                <Flame color={colors.warning} fill={colors.warning} size={21} strokeWidth={2.2} />
+              </View>
+              <View className="ml-4">
+                <AppText className="text-lg font-semibold leading-6" style={{ color: colors.text }}>{streakLabel}</AppText>
+                <AppText className="text-[13px] leading-[18px]" style={{ color: colors.muted }}>You&apos;re on a roll!</AppText>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View className="gap-4 pt-6">
+          <Pressable accessibilityRole="button" className="min-h-14 items-center justify-center rounded-lg" style={{ backgroundColor: colors.primary }} onPress={onBackHome}>
+            <AppText className="text-base font-medium leading-6" style={{ color: '#ffffff' }}>Back Home</AppText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            className="min-h-14 items-center justify-center rounded-lg border"
+            style={{ backgroundColor: colors.primarySoft, borderColor: colors.border }}
+            onPress={onAddNewWord}
+          >
+            <AppText className="text-base font-medium leading-6" style={{ color: colors.primary }}>
+              Add New Word
+            </AppText>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </Screen>
+  );
+}
 
 export default function ReviewSessionScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const appAlert = useAppAlert();
   const { deckId } = useLocalSearchParams<{ deckId?: string }>();
   const dueWords = useDueWordsQuery(deckId);
   const answer = useAnswerWordReviewMutation();
-  const [sessionWords, setSessionWords] = useState<Word[]>([]);
+  const stats = useHomeStatsQuery();
+  const [sessionWords, setSessionWords] = useState<ReviewWord[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [summary, setSummary] = useState({ forgot: 0, remembered: 0 });
+  const [examplesExpanded, setExamplesExpanded] = useState(false);
+  const [summary, setSummary] = useState<SessionSummary>({ forgot: 0, remembered: 0, mastered: 0 });
 
   useEffect(() => {
     if (hasStarted || !dueWords.data) return;
-    setSessionWords(dueWords.data as Word[]);
+    setSessionWords(dueWords.data);
     setHasStarted(true);
   }, [dueWords.data, hasStarted]);
 
   const current = sessionWords[0];
   const totalAnswered = summary.forgot + summary.remembered;
   const total = totalAnswered + sessionWords.length;
-  const progress = useMemo(() => total ? `${Math.min(totalAnswered + 1, total)} / ${total}` : '0 / 0', [total, totalAnswered]);
+  const progress = total ? `${Math.min(totalAnswered + 1, total)} / ${total}` : '0 / 0';
+  const progressPercent = total ? ((totalAnswered + (current ? 1 : 0)) / total) * 100 : 0;
+  const modeLabel = deckId ? 'Deck review' : 'Daily review';
 
   const close = () => {
     if (totalAnswered > 0 && sessionWords.length > 0) {
-      Alert.alert('End review session?', 'Your progress in this session will be saved.', [
-        { text: 'Keep reviewing', style: 'cancel' },
-        { text: 'End session', style: 'destructive', onPress: () => router.back() },
-      ]);
+      appAlert.show({
+        title: 'End review session?',
+        message: 'Your progress in this session will be saved.',
+        variant: 'danger',
+        actions: [
+          { text: 'Keep reviewing', style: 'cancel' },
+          { text: 'End session', style: 'destructive', onPress: () => router.back() },
+        ],
+      });
       return;
     }
     router.back();
@@ -42,62 +311,75 @@ export default function ReviewSessionScreen() {
   const submit = async (result: 'forgot' | 'remembered') => {
     if (!current || answer.isPending) return;
     try {
-      await answer.mutateAsync({ wordId: current.id, result });
-      setSummary((value) => ({ ...value, [result]: value[result] + 1 }));
+      const reviewResult = await answer.mutateAsync({ wordId: current.id, result });
+      setSummary((value) => ({
+        ...value,
+        [result]: value[result] + 1,
+        mastered: value.mastered + (reviewResult.newly_mastered ? 1 : 0),
+      }));
       setRevealed(false);
+      setExamplesExpanded(false);
       setSessionWords((value) => value.slice(1));
     } catch (error) {
-      Alert.alert('Review failed', error instanceof Error ? error.message : 'Please try again.');
+      appAlert.show({ title: 'Review failed', message: error instanceof Error ? error.message : 'Please try again.', variant: 'danger' });
     }
   };
 
   if (dueWords.isLoading || !hasStarted) {
-    return <Screen className="items-center justify-center bg-slate-950"><AppText className="text-white">Loading review...</AppText></Screen>;
+    return <Screen className="items-center justify-center"><AppText style={{ color: colors.muted }}>Loading review...</AppText></Screen>;
   }
 
   if (!current) {
     return (
-      <Screen className="justify-center bg-slate-950">
-        <Card className="gap-4 bg-slate-900">
-          <AppText className="text-center text-3xl font-bold text-white">All done for today</AppText>
-          <AppText className="text-center text-slate-300">Great job. Come back tomorrow.</AppText>
-          <View className="flex-row justify-center gap-3">
-            <AppText className="text-primary-100">Need practice: {summary.forgot}</AppText>
-            <AppText className="text-primary-100">Remembered: {summary.remembered}</AppText>
-          </View>
-          <Button title="Back to Review" onPress={() => router.back()} />
-        </Card>
-      </Screen>
+      <ReviewDoneScreen
+        summary={summary}
+        currentStreak={stats.data?.currentStreak}
+        onBackHome={() => router.replace('/(protected)/(tabs)/home')}
+        onAddNewWord={() => router.push('/(protected)/word/quick-add')}
+      />
     );
   }
 
   return (
-    <Screen className="bg-slate-950 pt-6">
-      <View className="flex-row items-center justify-between">
-        <Button title="Close" variant="ghost" onPress={close} />
-        <AppText className="font-semibold text-white">{progress}</AppText>
+    <Screen className="px-0" style={{ backgroundColor: colors.canvas }}>
+      <View className="border-b px-5 pb-4 pt-3" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+        <View className="h-12 flex-row items-center justify-between">
+          <Pressable accessibilityRole="button" accessibilityLabel="Close review" className="h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySoft }} onPress={close}>
+            <X color={colors.text} size={20} />
+          </Pressable>
+          <AppText className="text-lg font-bold" style={{ color: colors.text }}>Review</AppText>
+          <AppText className="w-10 text-right text-sm font-semibold" style={{ color: colors.muted }}>{progress}</AppText>
+        </View>
+        <View className="mt-2 h-2 overflow-hidden rounded-full" style={{ backgroundColor: colors.primarySoft }}>
+          <View className="h-full rounded-full" style={{ width: `${progressPercent}%`, backgroundColor: colors.primary }} />
+        </View>
+        <View className="mt-2 flex-row items-center justify-between">
+          <AppText className="text-xs font-semibold uppercase tracking-widest" style={{ color: colors.muted }}>{modeLabel}</AppText>
+          <AppText className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: colors.primarySoft, color: colors.primary }}>{current.decks?.name ?? 'Review'}</AppText>
+        </View>
       </View>
-      <View className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
-        <View className="h-full bg-primary-500" style={{ width: `${total ? ((totalAnswered + 1) / total) * 100 : 0}%` }} />
+
+      <View className="flex-1 justify-center px-5 py-5">
+        {revealed ? (
+          <FlashcardBack
+            word={current}
+            examplesExpanded={examplesExpanded}
+            onToggleExamples={() => setExamplesExpanded((value) => !value)}
+            onReturnFront={() => {
+              setRevealed(false);
+              setExamplesExpanded(false);
+            }}
+          />
+        ) : (
+          <FlashcardFront word={current} modeLabel={modeLabel} onReveal={() => setRevealed(true)} />
+        )}
       </View>
-      <View className="flex-1 justify-center">
-        <Pressable accessibilityRole="button" accessibilityLabel="Reveal word meaning" onPress={() => setRevealed(true)}>
-          <Card className="min-h-[360px] justify-center gap-4 bg-slate-900">
-            <AppText className="text-center text-primary-100">{deckId ? 'DECK REVIEW' : 'DAILY REVIEW'}</AppText>
-            <AppText className="text-center text-5xl font-bold text-white">{current.word}</AppText>
-            {current.phonetic ? <AppText className="text-center text-slate-300">{current.phonetic}</AppText> : null}
-            {revealed ? (
-              <>
-                <AppText className="text-center text-xl text-white">{current.meaning}</AppText>
-                {current.example ? <AppText className="text-center text-slate-300">“{current.example}”</AppText> : null}
-              </>
-            ) : <AppText className="text-center text-slate-300">Tap to reveal meaning</AppText>}
-          </Card>
-        </Pressable>
-      </View>
-      <View className="mb-6 flex-row gap-3">
-        <Button title="Need practice" variant="secondary" disabled={!revealed || answer.isPending} className="flex-1" onPress={() => submit('forgot')} />
-        <Button title="Remembered" disabled={!revealed || answer.isPending} className="flex-1" onPress={() => submit('remembered')} />
+
+      <View className="border-t px-5 pb-6 pt-4" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+        <View className="flex-row gap-3">
+          <Button title="Forgot" variant="danger" disabled={!revealed || answer.isPending} className="flex-1 rounded-xl" onPress={() => submit('forgot')} />
+          <Button title="Remembered" disabled={!revealed || answer.isPending} className="flex-1 rounded-xl" style={{ backgroundColor: colors.success }} onPress={() => submit('remembered')} />
+        </View>
       </View>
     </Screen>
   );

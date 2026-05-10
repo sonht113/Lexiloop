@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { z } from 'zod';
-import { AppText, Button, Card, FormInput, Screen } from '@/components/ui';
+import { AppText, Button, Card, FormInput, Screen, useAppAlert } from '@/components/ui';
 import { useSignUpMutation } from '@/features/auth/auth-hooks';
 import { usernameSchema } from '@/features/auth/auth-utils';
+import { useAppTheme } from '@/lib/theme-provider';
 
 const signUpSchema = z.object({
   username: usernameSchema,
@@ -20,6 +21,8 @@ type SignUpForm = z.infer<typeof signUpSchema>;
 
 export default function SignUpScreen() {
   const signUp = useSignUpMutation();
+  const { colors } = useAppTheme();
+  const appAlert = useAppAlert();
   const form = useForm<SignUpForm>({
     resolver: zodResolver(signUpSchema),
     defaultValues: { username: '', password: '', confirmPassword: '' },
@@ -29,7 +32,7 @@ export default function SignUpScreen() {
     try {
       await signUp.mutateAsync({ username, password });
     } catch (error) {
-      Alert.alert('Sign up failed', error instanceof Error ? error.message : 'Please try again.');
+      appAlert.show({ title: 'Sign up failed', message: error instanceof Error ? error.message : 'Please try again.', variant: 'danger' });
     }
   });
 
@@ -38,8 +41,8 @@ export default function SignUpScreen() {
       <Screen className="justify-center">
         <Card className="gap-5">
           <View>
-            <AppText className="text-3xl font-bold">Create account</AppText>
-            <AppText className="mt-2 text-muted">Start with your default Daily Life deck.</AppText>
+            <AppText className="text-3xl font-bold" style={{ color: colors.text }}>Create account</AppText>
+            <AppText className="mt-2" style={{ color: colors.muted }}>Start with your default Daily Life deck.</AppText>
           </View>
           <Controller control={form.control} name="username" render={({ field, fieldState }) => (
             <FormInput label="Username" autoCapitalize="none" autoCorrect={false} value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />

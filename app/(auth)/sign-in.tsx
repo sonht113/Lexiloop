@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { z } from 'zod';
-import { AppText, Button, Card, FormInput, Screen } from '@/components/ui';
+import { AppText, Button, Card, FormInput, Screen, useAppAlert } from '@/components/ui';
 import { useSignInMutation } from '@/features/auth/auth-hooks';
 import { usernameSchema } from '@/features/auth/auth-utils';
+import { useAppTheme } from '@/lib/theme-provider';
 
 const signInSchema = z.object({
   username: usernameSchema,
@@ -16,6 +17,8 @@ type SignInForm = z.infer<typeof signInSchema>;
 
 export default function SignInScreen() {
   const signIn = useSignInMutation();
+  const { colors } = useAppTheme();
+  const appAlert = useAppAlert();
   const form = useForm<SignInForm>({
     resolver: zodResolver(signInSchema),
     defaultValues: { username: '', password: '' },
@@ -25,7 +28,7 @@ export default function SignInScreen() {
     try {
       await signIn.mutateAsync(values);
     } catch (error) {
-      Alert.alert('Sign in failed', error instanceof Error ? error.message : 'Please try again.');
+      appAlert.show({ title: 'Sign in failed', message: error instanceof Error ? error.message : 'Please try again.', variant: 'danger' });
     }
   });
 
@@ -34,8 +37,8 @@ export default function SignInScreen() {
       <Screen className="justify-center">
         <Card className="gap-5">
           <View>
-            <AppText className="text-3xl font-bold">Welcome back</AppText>
-            <AppText className="mt-2 text-muted">Sign in to continue your daily vocabulary loop.</AppText>
+            <AppText className="text-3xl font-bold" style={{ color: colors.text }}>Welcome back</AppText>
+            <AppText className="mt-2" style={{ color: colors.muted }}>Sign in to continue your daily vocabulary loop.</AppText>
           </View>
           <Controller control={form.control} name="username" render={({ field, fieldState }) => (
             <FormInput label="Username" autoCapitalize="none" autoCorrect={false} value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />

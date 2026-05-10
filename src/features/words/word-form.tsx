@@ -1,22 +1,40 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useRef, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { Alert, View } from 'react-native';
-import { Button, EmptyState, FieldError, FormInput } from '@/components/ui';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { Pressable, View } from 'react-native';
+import { AppText, Button, EmptyState, FieldError, FormInput, useAppAlert } from '@/components/ui';
 import { DeckSelector } from '@/features/decks/deck-selector';
 import { useDecksQuery } from '@/features/decks/deck-hooks';
+import { useAppTheme } from '@/lib/theme-provider';
 import { useCreateWordMutation, useUpdateWordMutation } from './word-hooks';
 import { wordFormSchema, type WordFormValues } from './word-schema';
 import { fetchDictionaryPronunciation } from './dictionary-api';
-import type { Database } from '@/types/database';
+import type { WordWithExamples } from './word-hooks';
 
-type Word = Database['public']['Tables']['words']['Row'];
 type PronunciationState = 'idle' | 'loading' | 'success' | 'error';
 
-export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defaultDeckId?: string; onSuccess?: (mode: 'done' | 'again') => void }) {
+const emptyExample = { sentence: '', translation: '' };
+
+function getDefaultExamples(word?: WordWithExamples) {
+  const examples = (word?.word_examples ?? [])
+    .slice()
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((example) => ({
+      sentence: example.sentence,
+      translation: example.translation ?? '',
+    }));
+
+  if (examples.length > 0) return examples.slice(0, 3);
+  if (word?.example) return [{ sentence: word.example, translation: '' }];
+  return [emptyExample];
+}
+
+export function WordForm({ word, defaultDeckId, onSuccess }: { word?: WordWithExamples; defaultDeckId?: string; onSuccess?: (mode: 'done' | 'again') => void }) {
   const createWord = useCreateWordMutation();
   const updateWord = useUpdateWordMutation();
   const decks = useDecksQuery();
+  const { colors } = useAppTheme();
+  const appAlert = useAppAlert();
   const isEditing = Boolean(word);
   const isSaving = createWord.isPending || updateWord.isPending;
   const [pronunciationState, setPronunciationState] = useState<PronunciationState>('idle');
@@ -27,12 +45,13 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
       deck_id: word?.deck_id ?? defaultDeckId ?? '',
       word: word?.word ?? '',
       meaning: word?.meaning ?? '',
-      example: word?.example ?? '',
+      examples: getDefaultExamples(word),
       note: word?.note ?? '',
       phonetic: word?.phonetic ?? '',
       audio_url: word?.audio_url ?? '',
     },
   });
+  const examples = useFieldArray({ control: form.control, name: 'examples' });
 
   const selectedDeckId = form.watch('deck_id');
   const wordValue = form.watch('word');
@@ -74,7 +93,7 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
         deck_id: values.deck_id,
         word: values.word.trim(),
         meaning: values.meaning.trim(),
-        example: values.example?.trim() || null,
+        examples: values.examples,
         note: values.note?.trim() || null,
         phonetic: values.phonetic?.trim() || null,
         audio_url: values.audio_url?.trim() || null,
@@ -84,11 +103,15 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
       else await createWord.mutateAsync(input);
 
       if (mode === 'again' && !word) {
-        form.reset({ deck_id: values.deck_id, word: '', meaning: '', example: '', note: '', phonetic: '', audio_url: '' });
+        form.reset({ deck_id: values.deck_id, word: '', meaning: '', examples: [emptyExample], note: '', phonetic: '', audio_url: '' });
       }
       onSuccess?.(mode);
     } catch (error) {
-      Alert.alert(isEditing ? 'Update word failed' : 'Save word failed', error instanceof Error ? error.message : 'Please try again.');
+      appAlert.show({
+        title: isEditing ? 'Update word failed' : 'Save word failed',
+        message: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'danger',
+      });
     }
   });
 
@@ -108,9 +131,38 @@ export function WordForm({ word, defaultDeckId, onSuccess }: { word?: Word; defa
       <Controller control={form.control} name="meaning" render={({ field, fieldState }) => (
         <FormInput label="Meaning" placeholder="Bright or shining" multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
       )} />
-      <Controller control={form.control} name="example" render={({ field, fieldState }) => (
-        <FormInput label="Example" placeholder="The room was luminous with morning light." multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
-      )} />
+      <View className="gap-3">
+        <View className="flex-row items-center justify-between">
+          <AppText className="font-semibold">Examples</AppText>
+          <Pressable
+            accessibilityRole="button"
+            disabled={examples.fields.length >= 3}
+            className={examples.fields.length >= 3 ? 'opacity-40' : ''}
+            onPress={() => examples.append(emptyExample)}
+          >
+            <AppText className="font-semibold" style={{ color: colors.primary }}>Add example</AppText>
+          </Pressable>
+        </View>
+        {examples.fields.map((example, index) => (
+          <View key={example.id} className="gap-2 rounded-2xl border p-3" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+            <View className="flex-row items-center justify-between">
+              <AppText className="text-sm font-semibold" style={{ color: colors.muted }}>Example {index + 1}</AppText>
+              {examples.fields.length > 1 ? (
+                <Pressable accessibilityRole="button" onPress={() => examples.remove(index)}>
+                  <AppText className="text-sm font-semibold text-danger">Remove</AppText>
+                </Pressable>
+              ) : null}
+            </View>
+            <Controller control={form.control} name={`examples.${index}.sentence`} render={({ field, fieldState }) => (
+              <FormInput label="Sentence" placeholder="The room was luminous with morning light." multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
+            )} />
+            <Controller control={form.control} name={`examples.${index}.translation`} render={({ field, fieldState }) => (
+              <FormInput label="Translation" placeholder="Optional translation" multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
+            )} />
+          </View>
+        ))}
+        <FieldError message={form.formState.errors.examples?.message} />
+      </View>
       <Controller control={form.control} name="note" render={({ field, fieldState }) => (
         <FormInput label="Note" placeholder="Optional note" multiline value={field.value} onChangeText={field.onChange} onBlur={field.onBlur} error={fieldState.error?.message} />
       )} />

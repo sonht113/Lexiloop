@@ -2,6 +2,33 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type ReviewResult = 'forgot' | 'remembered';
 
+export type AnswerWordReviewResponse = {
+  ok: true;
+  word_id: string;
+  result: ReviewResult;
+  interval_days: number;
+  previous_correct_streak: number;
+  correct_streak: number;
+  was_mastered: boolean;
+  is_mastered: boolean;
+  newly_mastered: boolean;
+};
+
+export type WordExampleInput = {
+  sentence?: string;
+  translation?: string | null;
+};
+
+export type WordMutationInput = {
+  deck_id: string;
+  word: string;
+  meaning: string;
+  examples?: WordExampleInput[];
+  note?: string | null;
+  phonetic?: string | null;
+  audio_url?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -10,6 +37,7 @@ export type Database = {
           id: string;
           username: string;
           timezone: string;
+          avatar_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -17,6 +45,7 @@ export type Database = {
           id: string;
           username: string;
           timezone?: string;
+          avatar_url?: string | null;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
         Relationships: [];
@@ -84,6 +113,35 @@ export type Database = {
           },
         ];
       };
+      word_examples: {
+        Row: {
+          id: string;
+          user_id: string;
+          word_id: string;
+          sentence: string;
+          translation: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          word_id: string;
+          sentence: string;
+          translation?: string | null;
+          sort_order?: number;
+        };
+        Update: Partial<Database['public']['Tables']['word_examples']['Insert']>;
+        Relationships: [
+          {
+            foreignKeyName: 'word_examples_word_id_fkey';
+            columns: ['word_id'];
+            isOneToOne: false;
+            referencedRelation: 'words';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       review_logs: {
         Row: {
           id: string;
@@ -147,13 +205,43 @@ export type Database = {
           total_words: number;
           mastered_words: number;
           total_reviews: number;
+          reviewed_today: number;
           accuracy: number | null;
           current_streak: number;
         };
       };
+      get_decks_with_stats: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          user_id: string;
+          name: string;
+          description: string | null;
+          icon: string | null;
+          color: string | null;
+          created_at: string;
+          updated_at: string;
+          word_count: number;
+          due_count: number;
+          mastered_count: number;
+          mastery_percent: number;
+        }[];
+      };
+      ensure_default_deck: {
+        Args: { p_user_id: string };
+        Returns: void;
+      };
       answer_word_review: {
         Args: { p_word_id: string; p_result: ReviewResult };
-        Returns: Json;
+        Returns: AnswerWordReviewResponse;
+      };
+      create_word_with_examples: {
+        Args: { p_input: WordMutationInput };
+        Returns: Database['public']['Tables']['words']['Row'];
+      };
+      update_word_with_examples: {
+        Args: { p_word_id: string; p_input: WordMutationInput };
+        Returns: Database['public']['Tables']['words']['Row'];
       };
     };
   };

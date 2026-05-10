@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { AppText } from '@/components/ui';
+import { useAppTheme } from '@/lib/theme-provider';
 
 const days = [
   { label: 'Sun', value: 0 },
@@ -12,6 +13,7 @@ const days = [
 ];
 
 export function RepeatDaysSelector({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }) {
+  const { colors } = useAppTheme();
   const toggle = (day: number) => {
     if (value.includes(day)) onChange(value.filter((item) => item !== day));
     else onChange([...value, day].sort());
@@ -24,8 +26,13 @@ export function RepeatDaysSelector({ value, onChange }: { value: number[]; onCha
         {days.map((day) => {
           const selected = value.includes(day.value);
           return (
-            <Pressable key={day.value} className={`rounded-full px-4 py-2 ${selected ? 'bg-primary-600' : 'bg-primary-50'}`} onPress={() => toggle(day.value)}>
-              <AppText className={`font-semibold ${selected ? 'text-white' : 'text-primary-700'}`}>{day.label}</AppText>
+            <Pressable
+              key={day.value}
+              className="rounded-full px-4 py-2"
+              style={{ backgroundColor: selected ? colors.primary : colors.primarySoft }}
+              onPress={() => toggle(day.value)}
+            >
+              <AppText className="font-semibold" style={{ color: selected ? '#ffffff' : colors.primary }}>{day.label}</AppText>
             </Pressable>
           );
         })}

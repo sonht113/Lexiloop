@@ -1,0 +1,2 @@
+ eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+  eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon-key>

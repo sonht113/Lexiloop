@@ -4,6 +4,7 @@ node_modules/
 dist/
 build/
 web-build/
+.playwright-mcp/
 
 .env
 .env.local

@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { ReviewResult } from '@/types/database';
+import type { AnswerWordReviewResponse, Database, ReviewResult } from '@/types/database';
+
+type Deck = Pick<Database['public']['Tables']['decks']['Row'], 'id' | 'name' | 'color' | 'icon'>;
+type Word = Database['public']['Tables']['words']['Row'];
+type WordExample = Database['public']['Tables']['word_examples']['Row'];
+
+export type ReviewWord = Word & {
+  decks: Deck | null;
+  word_examples?: WordExample[];
+};
 
 export function useDueWordsQuery(deckId?: string) {
   return useQuery({
@@ -8,15 +17,16 @@ export function useDueWordsQuery(deckId?: string) {
     queryFn: async () => {
       let query = supabase
         .from('words')
-        .select('*, decks(id, name, color, icon)')
+        .select('*, decks(id, name, color, icon), word_examples(*)')
         .lte('due_at', new Date().toISOString())
-        .order('due_at', { ascending: true });
+        .order('due_at', { ascending: true })
+        .order('sort_order', { referencedTable: 'word_examples', ascending: true });
 
       if (deckId) query = query.eq('deck_id', deckId);
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data as ReviewWord[];
     },
   });
 }
@@ -31,7 +41,7 @@ export function useAnswerWordReviewMutation() {
         p_result: result,
       });
       if (error) throw error;
-      return data;
+      return data as AnswerWordReviewResponse;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['review'] });

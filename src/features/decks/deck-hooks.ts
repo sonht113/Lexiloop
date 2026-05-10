@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/database';
+
+export type DeckWithStats = Database['public']['Functions']['get_decks_with_stats']['Returns'][number];
 
 export function useDecksQuery() {
   return useQuery({
     queryKey: ['decks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('decks').select('*').order('created_at', { ascending: true });
+      const { data, error } = await supabase.rpc('get_decks_with_stats');
       if (error) throw error;
       return data;
     },

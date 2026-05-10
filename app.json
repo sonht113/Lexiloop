@@ -4,13 +4,28 @@
     "slug": "lexiloop",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "lexiloop",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
+    "updates": {
+      "url": "https://u.expo.dev/5bbb2264-eab3-4183-9dd6-f9930c3a1241"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font",
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LexiLoop to access your photos so you can choose a profile avatar."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -20,7 +35,26 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6366F1"
+      },
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.nuicoder.lexiloop"
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3525CD"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5bbb2264-eab3-4183-9dd6-f9930c3a1241"
       }
     }
   }

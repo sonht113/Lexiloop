@@ -1,4 +1,6 @@
 export * from './app-text';
+export * from './app-header';
+export * from './app-alert';
 export * from './button';
 export * from './card';
 export * from './empty-state';

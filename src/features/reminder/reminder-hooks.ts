@@ -1,13 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-export function useReminderSettingsQuery() {
+const defaultReminderSettings = {
+  enabled: false,
+  time: '20:00',
+  repeat_days: [0, 1, 2, 3, 4, 5, 6],
+  message: 'Time for your LexiLoop review.',
+};
+
+export function useReminderSettingsQuery(enabled = true) {
   return useQuery({
     queryKey: ['reminder-settings'],
+    enabled,
     queryFn: async () => {
-      const { data, error } = await supabase.from('reminder_settings').select('*').single();
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.from('reminder_settings').select('*').eq('user_id', userData.user.id).maybeSingle();
       if (error) throw error;
-      return data;
+      if (data) return data;
+
+      const { data: createdData, error: createdError } = await supabase
+        .from('reminder_settings')
+        .upsert({ user_id: userData.user.id, ...defaultReminderSettings }, { onConflict: 'user_id' })
+        .select('*')
+        .single();
+      if (createdError) throw createdError;
+      return createdData;
     },
   });
 }
@@ -23,7 +43,7 @@ export function useUpdateReminderSettingsMutation() {
 
       const { data, error } = await supabase
         .from('reminder_settings')
-        .upsert({ user_id: userData.user.id, ...input })
+        .upsert({ user_id: userData.user.id, ...input }, { onConflict: 'user_id' })
         .select('*')
         .single();
       if (error) throw error;
