@@ -6,6 +6,7 @@ build/
 web-build/
 .playwright-mcp/
 systems/
+issues/
 
 .env
 .env.local
