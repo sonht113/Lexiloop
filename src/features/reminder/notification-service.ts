@@ -1,14 +1,23 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Linking, Platform } from 'react-native';
+import { getExactReminderAccess } from '@/features/reminder/exact-alarm';
 
 type NotificationsModule = typeof import('expo-notifications');
 
 const REMINDER_NOTIFICATION_IDS_KEY = 'lexiloop_reminder_notification_ids';
+const REMINDER_SYNC_CONFIG_KEY = 'lexiloop_reminder_sync_config';
 const REMINDER_SYNC_STATUS_KEY = 'lexiloop_reminder_sync_status';
 const REMINDER_CHANNEL_ID = 'lexiloop-reminders-v2';
 
-export type ReminderSyncStatus = 'scheduled' | 'disabled' | 'unsupported' | 'permission-denied' | 'invalid-input' | 'failed';
+export type ReminderSyncStatus =
+  | 'scheduled'
+  | 'disabled'
+  | 'unsupported'
+  | 'permission-denied'
+  | 'exact-alarm-denied'
+  | 'invalid-input'
+  | 'failed';
 
 export type ReminderSyncResult = {
   status: ReminderSyncStatus;
@@ -95,10 +104,37 @@ async function getStoredReminderNotificationIds() {
 async function setStoredReminderNotificationIds(ids: string[]) {
   if (ids.length === 0) {
     await SecureStore.deleteItemAsync(REMINDER_NOTIFICATION_IDS_KEY);
+    await SecureStore.deleteItemAsync(REMINDER_SYNC_CONFIG_KEY);
     return;
   }
 
   await SecureStore.setItemAsync(REMINDER_NOTIFICATION_IDS_KEY, JSON.stringify(ids));
+}
+
+function createReminderSyncConfig(input: { enabled: boolean; time: string; repeatDays: number[]; message: string }) {
+  return JSON.stringify({
+    enabled: input.enabled,
+    time: input.time,
+    repeatDays: normalizeRepeatDays(input.repeatDays) ?? input.repeatDays,
+    message: input.message,
+  });
+}
+
+async function getStoredReminderSyncConfig() {
+  return SecureStore.getItemAsync(REMINDER_SYNC_CONFIG_KEY);
+}
+
+async function setStoredReminderSyncConfig(config: string) {
+  await SecureStore.setItemAsync(REMINDER_SYNC_CONFIG_KEY, config);
+}
+
+async function getActiveStoredReminderNotificationIds(Notifications: NotificationsModule) {
+  const storedIds = await getStoredReminderNotificationIds();
+  if (storedIds.length === 0) return [];
+
+  const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduledIds = new Set(scheduledNotifications.map((notification) => notification.identifier));
+  return storedIds.filter((id) => scheduledIds.has(id));
 }
 
 async function ensureReminderChannel(Notifications: NotificationsModule) {
@@ -179,7 +215,21 @@ export async function scheduleLexiLoopReminder(
     const shouldRequestPermission = options.requestPermission ?? true;
     const granted = current.granted || (shouldRequestPermission && (await Notifications.requestPermissionsAsync()).granted);
     if (!granted) {
+      await cancelLexiLoopReminders();
       const result = createReminderSyncResult('permission-denied', 'Enable notifications in Settings to receive reminders.');
+      await setLastReminderSyncResult(result);
+      return result;
+    }
+
+    const exactReminderAccess = await getExactReminderAccess();
+    if (exactReminderAccess !== 'granted') {
+      await cancelLexiLoopReminders();
+      const result = createReminderSyncResult(
+        'exact-alarm-denied',
+        exactReminderAccess === 'denied'
+          ? 'Allow Alarms & reminders for LexiLoop in Android Settings so reminders can fire at the exact time.'
+          : 'Install a build with exact alarm support, then allow Alarms & reminders for LexiLoop in Android Settings.',
+      );
       await setLastReminderSyncResult(result);
       return result;
     }
@@ -227,6 +277,7 @@ export async function scheduleLexiLoopReminder(
     }
 
     await setStoredReminderNotificationIds(notificationIds);
+    await setStoredReminderSyncConfig(createReminderSyncConfig({ enabled: true, ...input }));
     nextTriggerDates.sort();
     const result = createReminderSyncResult(
       'scheduled',
@@ -249,6 +300,21 @@ export async function scheduleLexiLoopReminder(
 export async function syncLexiLoopReminder(input: { enabled: boolean; time: string; repeatDays: number[]; message: string }) {
   if (!input.enabled) {
     return cancelLexiLoopReminders();
+  }
+
+  const syncConfig = createReminderSyncConfig(input);
+  const storedSyncConfig = await getStoredReminderSyncConfig();
+  const storedNotificationIds = await getStoredReminderNotificationIds();
+  if (storedSyncConfig === syncConfig && storedNotificationIds.length > 0) {
+    const Notifications = await getNotificationsModule();
+    const exactReminderAccess = await getExactReminderAccess();
+    if (Notifications && exactReminderAccess === 'granted') {
+      const activeStoredIds = await getActiveStoredReminderNotificationIds(Notifications);
+      if (activeStoredIds.length === storedNotificationIds.length) {
+        const result = await getLastReminderSyncResult();
+        if (result?.status === 'scheduled') return result;
+      }
+    }
   }
 
   return scheduleLexiLoopReminder(

@@ -236,24 +236,7 @@ export default function ReminderScreen() {
 
   const save = async () => {
     try {
-      if (enabled) {
-        const scheduled = await scheduleLexiLoopReminder({
-          time,
-          repeatDays: selectedDays,
-          message: REMINDER_MESSAGE,
-        });
-        setLastSyncResult(scheduled);
-        if (scheduled.status !== 'scheduled') {
-          appAlert.show({
-            title: 'Notifications disabled',
-            message: scheduled.message,
-            variant: 'warning',
-          });
-        }
-      } else {
-        const canceled = await cancelLexiLoopReminders();
-        setLastSyncResult(canceled);
-      }
+      let syncResult: ReminderSyncResult | null = null;
 
       await updateSettings.mutateAsync({
         enabled,
@@ -261,6 +244,30 @@ export default function ReminderScreen() {
         repeat_days: selectedDays,
         message: REMINDER_MESSAGE,
       });
+
+      if (enabled) {
+        const scheduled = await scheduleLexiLoopReminder({
+          time,
+          repeatDays: selectedDays,
+          message: REMINDER_MESSAGE,
+        });
+        syncResult = scheduled;
+        setLastSyncResult(scheduled);
+      } else {
+        const canceled = await cancelLexiLoopReminders();
+        syncResult = canceled;
+        setLastSyncResult(canceled);
+      }
+
+      if (enabled && syncResult?.status !== 'scheduled') {
+        appAlert.show({
+          title: syncResult?.status === 'exact-alarm-denied' ? 'Exact alarm required' : 'Notifications disabled',
+          message: syncResult?.message ?? 'Reminder settings were saved, but notifications could not be scheduled.',
+          variant: 'warning',
+        });
+        return;
+      }
+
       appAlert.show({ title: 'Reminder saved', message: 'Your reminder settings have been updated.', variant: 'success' });
     } catch (error) {
       appAlert.show({ title: 'Save failed', message: error instanceof Error ? error.message : 'Please try again.', variant: 'danger' });
@@ -317,7 +324,7 @@ export default function ReminderScreen() {
             {enabled && Platform.OS === 'android' ? (
               <View className="mt-4 rounded-xl px-4 py-3" style={{ backgroundColor: colors.primarySoft }}>
                 <AppText className="text-sm leading-5" style={{ color: colors.muted }}>
-                  Allow exact alarms to keep reminders on time.
+                  Allow Alarms & reminders so LexiLoop can notify exactly at your selected time.
                 </AppText>
                 <Pressable accessibilityRole="button" className="mt-2 self-start" onPress={openReminderAccuracySettings}>
                   <AppText className="text-sm font-semibold leading-5" style={{ color: colors.primary }}>
