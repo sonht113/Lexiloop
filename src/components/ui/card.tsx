@@ -7,7 +7,7 @@ export function Card({ children, className = '', style, ...props }: PropsWithChi
 
   return (
     <View
-      className={`rounded-xl3 bg-white p-5 shadow-sm ${className}`}
+      className={`rounded-xl bg-white p-5 shadow-sm ${className}`}
       style={[{ backgroundColor: colors.surface, borderColor: colors.border }, style]}
       {...props}
     >

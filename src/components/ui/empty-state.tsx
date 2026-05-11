@@ -8,7 +8,7 @@ export function EmptyState({ title, description, children }: PropsWithChildren<{
 
   return (
     <View
-      className="items-center justify-center rounded-xl3 border border-dashed border-slate-200 bg-white p-8"
+      className="items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white p-8"
       style={{ backgroundColor: colors.surface, borderColor: colors.border }}
     >
       <AppText className="text-center text-lg font-semibold">{title}</AppText>
