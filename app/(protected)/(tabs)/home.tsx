@@ -93,13 +93,13 @@ export default function HomeScreen() {
 
           <View className="mt-4">
             <View className="flex-row items-center justify-between gap-3">
-              <View className="min-w-0 flex-1 pr-2">
-                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="text-[13px] font-medium leading-[18px]" style={{ color: '#dad7ffe5' }}>
+              <View className="min-w-0 flex-1 pr-3">
+                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="w-full text-[13px] font-medium leading-[18px]" style={{ color: '#dad7ffe5', paddingRight: 6 }}>
                   Progress
                 </AppText>
               </View>
-              <View className="min-w-[72px] items-end pl-2">
-                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="text-right text-[13px] font-semibold leading-[18px]" style={{ color: '#dad7ffe5' }}>
+              <View className="min-w-[92px] items-end pl-3">
+                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="w-full text-right text-[13px] font-semibold leading-[18px]" style={{ color: '#dad7ffe5', paddingRight: 6 }}>
                   {progressText}
                 </AppText>
               </View>
