@@ -23,6 +23,7 @@ import {
   Sun,
   Target,
   Trophy,
+  Users,
 } from "lucide-react-native";
 import { AppText, Screen, useAppAlert } from "@/components/ui";
 import { useSignOutMutation } from "@/features/auth/auth-hooks";
@@ -92,7 +93,7 @@ function getReminderStatusSubtitle(
     syncResult.status === "disabled"
   )
     return reminderText;
-  return `${reminderText} · ${syncResult.message}`;
+  return `${reminderText} - ${syncResult.message}`;
 }
 
 export default function ProfileScreen() {
@@ -388,14 +389,14 @@ export default function ProfileScreen() {
             <View className="flex-row gap-4">
               <StatCard
                 title="Current Streak"
-                value={stats.data?.currentStreak ?? "—"}
+                value={stats.data?.currentStreak ?? "-"}
                 caption="days"
                 icon={Flame}
                 iconColor={colors.warning}
               />
               <StatCard
                 title="Total Words"
-                value={stats.data?.totalWords ?? "—"}
+                value={stats.data?.totalWords ?? "-"}
                 caption="captured"
                 icon={FileText}
                 iconColor="#ffffff"
@@ -405,14 +406,14 @@ export default function ProfileScreen() {
             <View className="flex-row gap-4">
               <StatCard
                 title="Mastered"
-                value={stats.data?.masteredWords ?? "—"}
+                value={stats.data?.masteredWords ?? "-"}
                 caption="words"
                 icon={Trophy}
                 iconColor={colors.success}
               />
               <StatCard
                 title="Accuracy"
-                value={accuracy == null ? "—" : `${accuracy}%`}
+                value={accuracy == null ? "-" : `${accuracy}%`}
                 caption="all time"
                 icon={Target}
                 iconColor="#6f50bd"
@@ -433,6 +434,13 @@ export default function ProfileScreen() {
             subtitle={reminderSubtitle}
             icon={Bell}
             onPress={() => router.push("/(protected)/reminder")}
+          />
+          <View className="h-px" style={{ backgroundColor: colors.border }} />
+          <SettingsRow
+            title="Leaderboard"
+            subtitle="Compare mastered words with other learners"
+            icon={Users}
+            onPress={() => router.push("/(protected)/leaderboard")}
           />
           <View className="h-px" style={{ backgroundColor: colors.border }} />
           <SettingsRow

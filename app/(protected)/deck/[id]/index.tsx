@@ -1,10 +1,10 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, MoreVertical, Play, Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, MoreVertical, Play, Plus, RotateCcw, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { AppText, EmptyState, Screen } from '@/components/ui';
 import { useDeckQuery, useDecksQuery } from '@/features/decks/deck-hooks';
-import { useDueWordsQuery } from '@/features/review/review-hooks';
+import { useDueWordsQuery, useWeakWordsQuery } from '@/features/review/review-hooks';
 import { getWordStatus, isLearningWordStatus, WordCard } from '@/features/words/word-card';
 import { WordForm } from '@/features/words/word-form';
 import { useWordsQuery } from '@/features/words/word-hooks';
@@ -56,6 +56,7 @@ export default function DeckDetailScreen() {
   const decks = useDecksQuery();
   const words = useWordsQuery(id);
   const dueWords = useDueWordsQuery(id);
+  const weakWords = useWeakWordsQuery(id);
   const [showAddWord, setShowAddWord] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -77,6 +78,7 @@ export default function DeckDetailScreen() {
   const deckStats = decks.data?.find((item) => item.id === id);
   const totalWords = deckStats?.word_count ?? words.data?.length ?? 0;
   const dueCount = deckStats?.due_count ?? dueWords.data?.length ?? 0;
+  const weakCount = weakWords.data?.length ?? 0;
   const masteredCount = deckStats?.mastered_count ?? words.data?.filter((word) => getWordStatus(word) === 'Mastered').length ?? 0;
   const deckName = deck.data?.name ?? deckStats?.name ?? 'Deck';
 
@@ -108,7 +110,7 @@ export default function DeckDetailScreen() {
           </View>
 
           <View className="mt-6 gap-4">
-            <Link href={`/(protected)/review/session?deckId=${id}`} asChild>
+            <Link href={`/(protected)/review/session?deckId=${id}&mode=due`} asChild>
               <Pressable
                 accessibilityRole="button"
                 className={`min-h-12 flex-row items-center justify-center gap-2 rounded-lg ${dueCount === 0 ? 'opacity-50' : ''}`}
@@ -116,13 +118,39 @@ export default function DeckDetailScreen() {
                 disabled={dueCount === 0}
               >
                 <Play color="#ffffff" fill="#ffffff" size={14} />
-                <AppText className="text-base font-medium leading-6" style={{ color: '#ffffff' }}>{dueCount > 0 ? 'Start Review' : 'No words due'}</AppText>
+                <AppText className="text-base font-medium leading-6" style={{ color: '#ffffff' }}>{dueCount > 0 ? `Review Due (${dueCount})` : 'No words due'}</AppText>
+              </Pressable>
+            </Link>
+            <Link href={`/(protected)/review/session?deckId=${id}&mode=practice`} asChild>
+              <Pressable
+                accessibilityRole="button"
+                className={`min-h-12 flex-row items-center justify-center gap-2 rounded-lg ${totalWords === 0 ? 'opacity-50' : ''}`}
+                style={{ backgroundColor: colors.primarySoft }}
+                disabled={totalWords === 0}
+              >
+                <RotateCcw color={colors.primary} size={15} />
+                <AppText className="text-base font-medium leading-6" style={{ color: colors.primary }}>
+                  {totalWords > 0 ? `Practice All (${totalWords})` : 'No words to practice'}
+                </AppText>
+              </Pressable>
+            </Link>
+            <Link href={`/(protected)/review/session?deckId=${id}&mode=weak`} asChild>
+              <Pressable
+                accessibilityRole="button"
+                className={`min-h-12 flex-row items-center justify-center gap-2 rounded-lg ${weakCount === 0 ? 'opacity-50' : ''}`}
+                style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }}
+                disabled={weakCount === 0}
+              >
+                <RotateCcw color={colors.warning} size={15} />
+                <AppText className="text-base font-medium leading-6" style={{ color: colors.warning }}>
+                  {weakCount > 0 ? `Practice Weak (${weakCount})` : 'No weak words'}
+                </AppText>
               </Pressable>
             </Link>
             <Pressable
               accessibilityRole="button"
               className="min-h-12 flex-row items-center justify-center gap-2 rounded-lg"
-              style={{ backgroundColor: colors.primarySoft }}
+              style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }}
               onPress={() => setShowAddWord((value) => !value)}
             >
               <Plus color={colors.primary} size={14} />

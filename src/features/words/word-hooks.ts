@@ -80,6 +80,7 @@ export function useCreateWordMutation() {
       queryClient.invalidateQueries({ queryKey: ['decks'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['review'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 }
@@ -110,6 +111,7 @@ export function useUpdateWordMutation() {
       queryClient.invalidateQueries({ queryKey: ['words', 'detail', word.id] });
       queryClient.invalidateQueries({ queryKey: ['review'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 }
@@ -127,6 +129,7 @@ export function useDeleteWordMutation() {
       queryClient.invalidateQueries({ queryKey: ['review'] });
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 }

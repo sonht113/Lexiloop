@@ -29,6 +29,20 @@ export type WordMutationInput = {
   audio_url?: string | null;
 };
 
+export type LeaderboardMetric = 'mastered' | 'words';
+
+export type LeaderboardRow = {
+  rank: number;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  total_words: number;
+  mastered_words: number;
+  total_reviews: number;
+  current_streak: number;
+  is_current_user: boolean;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -242,6 +256,10 @@ export type Database = {
       update_word_with_examples: {
         Args: { p_word_id: string; p_input: WordMutationInput };
         Returns: Database['public']['Tables']['words']['Row'];
+      };
+      get_leaderboard: {
+        Args: { p_metric?: LeaderboardMetric; p_limit?: number };
+        Returns: LeaderboardRow[];
       };
     };
   };

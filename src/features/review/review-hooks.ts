@@ -11,9 +11,10 @@ export type ReviewWord = Word & {
   word_examples?: WordExample[];
 };
 
-export function useDueWordsQuery(deckId?: string) {
+export function useDueWordsQuery(deckId?: string, enabled = true) {
   return useQuery({
     queryKey: ['review', 'due-words', deckId ?? 'daily'],
+    enabled,
     queryFn: async () => {
       let query = supabase
         .from('words')
@@ -21,6 +22,72 @@ export function useDueWordsQuery(deckId?: string) {
         .lte('due_at', new Date().toISOString())
         .order('due_at', { ascending: true })
         .order('sort_order', { referencedTable: 'word_examples', ascending: true });
+
+      if (deckId) query = query.eq('deck_id', deckId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ReviewWord[];
+    },
+  });
+}
+
+export function usePracticeWordsQuery(deckId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['review', 'practice-words', deckId ?? 'all'],
+    enabled,
+    queryFn: async () => {
+      let query = supabase
+        .from('words')
+        .select('*, decks(id, name, color, icon), word_examples(*)')
+        .order('due_at', { ascending: true })
+        .order('sort_order', { referencedTable: 'word_examples', ascending: true });
+
+      if (deckId) query = query.eq('deck_id', deckId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ReviewWord[];
+    },
+  });
+}
+
+export function useWeakWordsQuery(deckId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['review', 'weak-words', deckId ?? 'all'],
+    enabled,
+    queryFn: async () => {
+      let query = supabase
+        .from('words')
+        .select('*, decks(id, name, color, icon), word_examples(*)')
+        .gt('review_count', 0)
+        .gt('forgot_count', 0)
+        .order('forgot_count', { ascending: false })
+        .order('correct_streak', { ascending: true })
+        .order('due_at', { ascending: true })
+        .order('sort_order', { referencedTable: 'word_examples', ascending: true });
+
+      if (deckId) query = query.eq('deck_id', deckId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ReviewWord[];
+    },
+  });
+}
+
+export function useNewWordsQuery(deckId?: string, limit = 5, enabled = true) {
+  return useQuery({
+    queryKey: ['review', 'new-words', deckId ?? 'all', limit],
+    enabled,
+    queryFn: async () => {
+      let query = supabase
+        .from('words')
+        .select('*, decks(id, name, color, icon), word_examples(*)')
+        .eq('review_count', 0)
+        .order('created_at', { ascending: true })
+        .order('sort_order', { referencedTable: 'word_examples', ascending: true })
+        .limit(limit);
 
       if (deckId) query = query.eq('deck_id', deckId);
 
@@ -48,6 +115,7 @@ export function useAnswerWordReviewMutation() {
       queryClient.invalidateQueries({ queryKey: ['home'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['words'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
     },
   });
 }

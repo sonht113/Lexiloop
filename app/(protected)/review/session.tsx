@@ -3,10 +3,22 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { createAudioPlayer } from 'expo-audio';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, Flame, RotateCcw, Volume2, X } from 'lucide-react-native';
-import { AppText, Button, Card, Screen, useAppAlert } from '@/components/ui';
+import { AppText, Button, Card, EmptyState, Screen, useAppAlert } from '@/components/ui';
 import { useHomeStatsQuery } from '@/features/home/home-hooks';
-import { useAnswerWordReviewMutation, useDueWordsQuery, type ReviewWord } from '@/features/review/review-hooks';
+import {
+  useAnswerWordReviewMutation,
+  useDueWordsQuery,
+  useNewWordsQuery,
+  usePracticeWordsQuery,
+  useWeakWordsQuery,
+  type ReviewWord,
+} from '@/features/review/review-hooks';
 import { useAppTheme } from '@/lib/theme-provider';
+
+const PRACTICE_TARGET_REMEMBERED = 2;
+const NEW_WORDS_SESSION_LIMIT = 5;
+
+type ReviewMode = 'due' | 'practice' | 'weak' | 'new';
 
 type ReviewExample = {
   id: string;
@@ -19,7 +31,11 @@ type SessionSummary = {
   forgot: number;
   remembered: number;
   mastered: number;
+  practiced: number;
+  repeatedCards: number;
 };
+
+type PracticeProgress = Record<string, { remembered: number; forgot: number; seen: boolean }>;
 
 function getExamples(word: ReviewWord): ReviewExample[] {
   const examples = (word.word_examples ?? [])
@@ -199,18 +215,24 @@ function SummaryRow({ icon, label, value, valueColor }: { icon: ReactNode; label
 
 function ReviewDoneScreen({
   summary,
+  mode,
   currentStreak,
   onBackHome,
   onAddNewWord,
 }: {
   summary: SessionSummary;
+  mode: ReviewMode;
   currentStreak?: number;
   onBackHome: () => void;
   onAddNewWord: () => void;
 }) {
   const { colors } = useAppTheme();
-  const reviewed = summary.forgot + summary.remembered;
+  const isLocalPracticeMode = mode === 'practice' || mode === 'weak';
+  const isNewMode = mode === 'new';
+  const reviewed = isLocalPracticeMode ? summary.practiced : summary.forgot + summary.remembered;
   const streakLabel = typeof currentStreak === 'number' ? `${currentStreak} day streak` : '-- day streak';
+  const title = isLocalPracticeMode ? 'Practice complete' : isNewMode ? 'New words learned' : 'All done for today';
+  const subtitle = isLocalPracticeMode ? 'Your SRS schedule stayed unchanged.' : isNewMode ? 'These words are now in your review schedule.' : 'Great job. Come back tomorrow.';
 
   return (
     <Screen className="px-5" style={{ backgroundColor: colors.canvas }}>
@@ -220,16 +242,20 @@ function ReviewDoneScreen({
             <View className="mb-4 h-24 w-24 items-center justify-center rounded-full shadow-sm" style={{ backgroundColor: colors.primarySoft }}>
               <CheckCircle2 color={colors.success} size={40} strokeWidth={2.5} />
             </View>
-            <AppText className="text-center text-[32px] font-bold leading-10" style={{ color: colors.text }}>All done for today</AppText>
-            <AppText className="mt-4 text-center text-base leading-6" style={{ color: colors.muted }}>Great job. Come back tomorrow.</AppText>
+            <AppText className="text-center text-[32px] font-bold leading-10" style={{ color: colors.text }}>{title}</AppText>
+            <AppText className="mt-4 text-center text-base leading-6" style={{ color: colors.muted }}>{subtitle}</AppText>
           </View>
 
           <View className="mt-8 gap-4">
             <Card className="rounded-xl border p-6 shadow-none" style={{ borderColor: colors.border }}>
               <AppText className="mb-2 text-lg font-semibold leading-6" style={{ color: colors.text }}>Session Summary</AppText>
-              <SummaryRow icon={<ClipboardCheck color={colors.muted} size={18} strokeWidth={2.4} />} label="Reviewed" value={reviewed} />
+              <SummaryRow icon={<ClipboardCheck color={colors.muted} size={18} strokeWidth={2.4} />} label={isLocalPracticeMode ? 'Practiced' : 'Reviewed'} value={reviewed} />
               <SummaryRow icon={<CheckCircle2 color={colors.success} size={18} strokeWidth={2.4} />} label="Remembered" value={summary.remembered} valueColor={colors.success} />
-              <SummaryRow icon={<CheckCircle2 color={colors.success} size={18} strokeWidth={2.4} />} label="Mastered today" value={summary.mastered} valueColor={colors.success} />
+              {isLocalPracticeMode ? (
+                <SummaryRow icon={<RotateCcw color={colors.primary} size={18} strokeWidth={2.4} />} label="Repeated cards" value={summary.repeatedCards} valueColor={colors.primary} />
+              ) : (
+                <SummaryRow icon={<CheckCircle2 color={colors.success} size={18} strokeWidth={2.4} />} label="Mastered today" value={summary.mastered} valueColor={colors.success} />
+              )}
               <SummaryRow icon={<Flame color={colors.warning} fill={colors.warning} size={19} strokeWidth={2.2} />} label="Need practice" value={summary.forgot} valueColor={colors.warning} />
             </Card>
 
@@ -238,8 +264,10 @@ function ReviewDoneScreen({
                 <Flame color={colors.warning} fill={colors.warning} size={21} strokeWidth={2.2} />
               </View>
               <View className="ml-4">
-                <AppText className="text-lg font-semibold leading-6" style={{ color: colors.text }}>{streakLabel}</AppText>
-                <AppText className="text-[13px] leading-[18px]" style={{ color: colors.muted }}>You&apos;re on a roll!</AppText>
+                <AppText className="text-lg font-semibold leading-6" style={{ color: colors.text }}>{isLocalPracticeMode ? 'Practice does not move due dates' : streakLabel}</AppText>
+                <AppText className="text-[13px] leading-[18px]" style={{ color: colors.muted }}>
+                  {isLocalPracticeMode ? 'Use Review Due for spaced repetition progress.' : "You're on a roll!"}
+                </AppText>
               </View>
             </View>
           </View>
@@ -265,38 +293,83 @@ function ReviewDoneScreen({
   );
 }
 
+function ReviewEmptyScreen({ mode, onBackHome, onAddNewWord }: { mode: ReviewMode; onBackHome: () => void; onAddNewWord: () => void }) {
+  const { colors } = useAppTheme();
+  const copy = {
+    due: {
+      title: 'No reviews due',
+      description: 'Your scheduled reviews are clear right now.',
+    },
+    new: {
+      title: 'No new words',
+      description: 'Add more words to start a new learning session.',
+    },
+    weak: {
+      title: 'No weak words',
+      description: 'Words you miss will appear here for extra practice.',
+    },
+    practice: {
+      title: 'No words to practice',
+      description: 'Add words to this deck before starting practice.',
+    },
+  }[mode];
+
+  return (
+    <Screen className="items-center justify-center px-5" style={{ backgroundColor: colors.canvas }}>
+      <EmptyState title={copy.title} description={copy.description}>
+        <View className="w-full min-w-52 gap-3">
+          <Button title="Back Home" onPress={onBackHome} />
+          <Button title="Add New Word" variant="secondary" onPress={onAddNewWord} />
+        </View>
+      </EmptyState>
+    </Screen>
+  );
+}
+
 export default function ReviewSessionScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
   const appAlert = useAppAlert();
-  const { deckId } = useLocalSearchParams<{ deckId?: string }>();
-  const dueWords = useDueWordsQuery(deckId);
+  const { deckId, mode } = useLocalSearchParams<{ deckId?: string; mode?: string }>();
+  const reviewMode: ReviewMode = mode === 'practice' || mode === 'weak' || mode === 'new' ? mode : 'due';
+  const isLocalPracticeMode = reviewMode === 'practice' || reviewMode === 'weak';
+  const dueWords = useDueWordsQuery(deckId, reviewMode === 'due');
+  const practiceWords = usePracticeWordsQuery(deckId, reviewMode === 'practice');
+  const weakWords = useWeakWordsQuery(deckId, reviewMode === 'weak');
+  const newWords = useNewWordsQuery(deckId, NEW_WORDS_SESSION_LIMIT, reviewMode === 'new');
+  const activeWords = reviewMode === 'practice' ? practiceWords : reviewMode === 'weak' ? weakWords : reviewMode === 'new' ? newWords : dueWords;
   const answer = useAnswerWordReviewMutation();
   const stats = useHomeStatsQuery();
   const [sessionWords, setSessionWords] = useState<ReviewWord[]>([]);
+  const [initialSessionWordCount, setInitialSessionWordCount] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [examplesExpanded, setExamplesExpanded] = useState(false);
-  const [summary, setSummary] = useState<SessionSummary>({ forgot: 0, remembered: 0, mastered: 0 });
+  const [summary, setSummary] = useState<SessionSummary>({ forgot: 0, remembered: 0, mastered: 0, practiced: 0, repeatedCards: 0 });
+  const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>({});
 
   useEffect(() => {
-    if (hasStarted || !dueWords.data) return;
-    setSessionWords(dueWords.data);
+    if (hasStarted || !activeWords.data) return;
+    setSessionWords(activeWords.data);
+    setInitialSessionWordCount(activeWords.data.length);
     setHasStarted(true);
-  }, [dueWords.data, hasStarted]);
+  }, [activeWords.data, hasStarted]);
 
   const current = sessionWords[0];
   const totalAnswered = summary.forgot + summary.remembered;
-  const total = totalAnswered + sessionWords.length;
-  const progress = total ? `${Math.min(totalAnswered + 1, total)} / ${total}` : '0 / 0';
-  const progressPercent = total ? ((totalAnswered + (current ? 1 : 0)) / total) * 100 : 0;
-  const modeLabel = deckId ? 'Deck review' : 'Daily review';
+  const completedPracticeCount = isLocalPracticeMode ? summary.remembered : 0;
+  const total = initialSessionWordCount;
+  const completedCount = isLocalPracticeMode ? completedPracticeCount : totalAnswered;
+  const progress = total ? `${Math.min(completedCount + (current ? 1 : 0), total)} / ${total}` : '0 / 0';
+  const progressPercent = total ? (Math.min(completedCount + (current ? 1 : 0), total) / total) * 100 : 0;
+  const modeLabel = reviewMode === 'practice' ? 'Practice all' : reviewMode === 'weak' ? 'Practice weak' : reviewMode === 'new' ? 'Learn new' : deckId ? 'Deck review' : 'Daily review';
+  const isSubmitting = !isLocalPracticeMode && answer.isPending;
 
   const close = () => {
-    if (totalAnswered > 0 && sessionWords.length > 0) {
+    if (completedCount > 0 && sessionWords.length > 0) {
       appAlert.show({
         title: 'End review session?',
-        message: 'Your progress in this session will be saved.',
+        message: isLocalPracticeMode ? 'This practice session will end.' : 'Your progress in this session will be saved.',
         variant: 'danger',
         actions: [
           { text: 'Keep reviewing', style: 'cancel' },
@@ -309,7 +382,38 @@ export default function ReviewSessionScreen() {
   };
 
   const submit = async (result: 'forgot' | 'remembered') => {
-    if (!current || answer.isPending) return;
+    if (!current || isSubmitting) return;
+
+    if (isLocalPracticeMode) {
+      const previous = practiceProgress[current.id] ?? { remembered: 0, forgot: 0, seen: false };
+      const nextRemembered = result === 'remembered' ? previous.remembered + 1 : previous.remembered;
+      const nextForgot = result === 'forgot' ? previous.forgot + 1 : previous.forgot;
+      const completed = nextRemembered >= PRACTICE_TARGET_REMEMBERED;
+
+      setPracticeProgress((value) => ({
+        ...value,
+        [current.id]: {
+          remembered: nextRemembered,
+          forgot: nextForgot,
+          seen: true,
+        },
+      }));
+      setSummary((value) => ({
+        ...value,
+        practiced: value.practiced + (previous.seen ? 0 : 1),
+        remembered: value.remembered + (completed && previous.remembered < PRACTICE_TARGET_REMEMBERED ? 1 : 0),
+        forgot: value.forgot + (result === 'forgot' && previous.forgot === 0 ? 1 : 0),
+        repeatedCards: value.repeatedCards + (previous.seen ? 1 : 0),
+      }));
+      setRevealed(false);
+      setExamplesExpanded(false);
+      setSessionWords((value) => {
+        const [, ...rest] = value;
+        return completed ? rest : [...rest, current];
+      });
+      return;
+    }
+
     try {
       const reviewResult = await answer.mutateAsync({ wordId: current.id, result });
       setSummary((value) => ({
@@ -325,15 +429,35 @@ export default function ReviewSessionScreen() {
     }
   };
 
-  if (dueWords.isLoading || !hasStarted) {
+  if (activeWords.isError) {
+    return (
+      <Screen className="items-center justify-center px-5" style={{ backgroundColor: colors.canvas }}>
+        <EmptyState title="Could not load review" description="Please try again later." />
+        <Button title="Back" className="mt-4 min-w-32" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
+  if (activeWords.isLoading || !hasStarted) {
     return <Screen className="items-center justify-center"><AppText style={{ color: colors.muted }}>Loading review...</AppText></Screen>;
+  }
+
+  if (!current && initialSessionWordCount === 0) {
+    return (
+      <ReviewEmptyScreen
+        mode={reviewMode}
+        onBackHome={() => router.replace('/(protected)/(tabs)/home')}
+        onAddNewWord={() => router.push('/(protected)/word/quick-add')}
+      />
+    );
   }
 
   if (!current) {
     return (
       <ReviewDoneScreen
         summary={summary}
-        currentStreak={stats.data?.currentStreak}
+        mode={reviewMode}
+        currentStreak={isLocalPracticeMode ? undefined : stats.data?.currentStreak}
         onBackHome={() => router.replace('/(protected)/(tabs)/home')}
         onAddNewWord={() => router.push('/(protected)/word/quick-add')}
       />
@@ -377,8 +501,8 @@ export default function ReviewSessionScreen() {
 
       <View className="border-t px-5 pb-6 pt-4" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
         <View className="flex-row gap-3">
-          <Button title="Forgot" variant="danger" disabled={!revealed || answer.isPending} className="flex-1 rounded-xl" onPress={() => submit('forgot')} />
-          <Button title="Remembered" disabled={!revealed || answer.isPending} className="flex-1 rounded-xl" style={{ backgroundColor: colors.success }} onPress={() => submit('remembered')} />
+          <Button title="Forgot" variant="danger" disabled={!revealed || isSubmitting} className="flex-1 rounded-xl" onPress={() => submit('forgot')} />
+          <Button title="Remembered" disabled={!revealed || isSubmitting} className="flex-1 rounded-xl" style={{ backgroundColor: colors.success }} onPress={() => submit('remembered')} />
         </View>
       </View>
     </Screen>
