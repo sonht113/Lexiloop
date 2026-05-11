@@ -62,6 +62,7 @@ export function useWeakWordsQuery(deckId?: string, enabled = true) {
         .select('*, decks(id, name, color, icon), word_examples(*)')
         .gt('review_count', 0)
         .gt('forgot_count', 0)
+        .lte('due_at', new Date().toISOString())
         .order('forgot_count', { ascending: false })
         .order('correct_streak', { ascending: true })
         .order('due_at', { ascending: true })

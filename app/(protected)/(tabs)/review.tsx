@@ -131,10 +131,10 @@ export default function ReviewLandingScreen() {
           }
         : weakCount > 0
           ? {
-              title: 'Practice weak words',
-              subtitle: `${weakCount} ${weakCount === 1 ? 'word needs' : 'words need'} extra reinforcement.`,
+              title: 'Start weak review',
+              subtitle: `${weakCount} weak ${weakCount === 1 ? 'word is' : 'words are'} due for reinforcement.`,
               href: '/(protected)/review/session?mode=weak' as const,
-              label: 'Practice Weak',
+              label: 'Weak Review',
             }
           : totalWords > 0
             ? {
@@ -227,8 +227,8 @@ export default function ReviewLandingScreen() {
               disabled={planHasError || newCount === 0}
             />
             <ReviewActionCard
-              title="Practice Weak"
-              subtitle="Repeat words you have missed before."
+              title="Weak Review"
+              subtitle="Reschedule weak words by how well you remember them."
               count={planIsLoading ? '-' : String(weakCount)}
               status={weakCount > 0 ? 'Ready' : 'Clear'}
               href="/(protected)/review/session?mode=weak"

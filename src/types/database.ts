@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type ReviewResult = 'forgot' | 'remembered';
+export type ReviewResult = 'forgot' | 'soon' | 'remembered';
 
 export type AnswerWordReviewResponse = {
   ok: true;
@@ -101,6 +101,7 @@ export type Database = {
           correct_streak: number;
           review_count: number;
           forgot_count: number;
+          soon_count: number;
           remembered_count: number;
           created_at: string;
           updated_at: string;

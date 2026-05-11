@@ -143,7 +143,7 @@ export default function DeckDetailScreen() {
               >
                 <RotateCcw color={colors.warning} size={15} />
                 <AppText className="text-base font-medium leading-6" style={{ color: colors.warning }}>
-                  {weakCount > 0 ? `Practice Weak (${weakCount})` : 'No weak words'}
+                  {weakCount > 0 ? `Weak Review (${weakCount})` : 'No weak words due'}
                 </AppText>
               </Pressable>
             </Link>
