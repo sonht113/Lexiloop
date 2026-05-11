@@ -58,7 +58,7 @@ export default function HomeScreen() {
       : newCount > 0
         ? { href: '/(protected)/review/session?mode=new', label: 'Learn New' }
         : weakCount > 0
-          ? { href: '/(protected)/review/session?mode=weak', label: 'Practice Weak' }
+          ? { href: '/(protected)/review/session?mode=weak', label: 'Weak Review' }
           : null;
 
   return (
@@ -92,13 +92,17 @@ export default function HomeScreen() {
           </View>
 
           <View className="mt-4">
-            <View className="flex-row items-center justify-between">
-              <AppText className="text-[13px] leading-[18px]" style={{ color: '#dad7ffe5' }}>
-                Progress
-              </AppText>
-              <AppText className="text-[13px] leading-[18px]" style={{ color: '#dad7ffe5' }}>
-                {progressText}
-              </AppText>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="min-w-0 flex-1 pr-2">
+                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="text-[13px] font-medium leading-[18px]" style={{ color: '#dad7ffe5' }}>
+                  Progress
+                </AppText>
+              </View>
+              <View className="min-w-[72px] items-end pl-2">
+                <AppText numberOfLines={1} maxFontSizeMultiplier={1.15} className="text-right text-[13px] font-semibold leading-[18px]" style={{ color: '#dad7ffe5' }}>
+                  {progressText}
+                </AppText>
+              </View>
             </View>
             <View className="mt-2 h-2 overflow-hidden rounded-full" style={{ backgroundColor: '#00000033' }}>
               <View className="h-2 rounded-full" style={{ width: `${progress * 100}%`, backgroundColor: '#ffffff' }} />
@@ -151,8 +155,8 @@ export default function HomeScreen() {
               icon={<BookOpen color={colors.success} size={18} strokeWidth={2.4} />}
             />
             <PlanTask
-              title="Practice Weak"
-              subtitle={weakCount > 0 ? `${weakCount} words need extra practice` : 'No weak words found'}
+              title="Weak Review"
+              subtitle={weakCount > 0 ? `${weakCount} weak words are due now` : 'No weak words due now'}
               status={weakCount > 0 ? 'Ready' : 'Done'}
               href="/(protected)/review/session?mode=weak"
               disabled={planHasError || weakCount === 0}
