@@ -1,2 +1,4 @@
- eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
-  eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon-key>
+eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value <supabase-url>
+eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value <anon-key>
+npx eas-cli build --profile apk --platform android --clear-cache
+eas update --branch preview --platform android --message "Update preview"
