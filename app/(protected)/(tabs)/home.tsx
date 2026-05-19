@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
-import { Bell, BookOpen, ClipboardCheck, Flame, Plus, RotateCcw, Trophy, Users, Zap } from 'lucide-react-native';
+import { Bell, BookOpen, CalendarDays, ClipboardCheck, Flame, Plus, RotateCcw, Trophy, Users, Zap } from 'lucide-react-native';
 import { AppText, EmptyState } from '@/components/ui';
-import { useHomeStatsQuery } from '@/features/home/home-hooks';
-import { useNewWordsQuery, useWeakWordsQuery } from '@/features/review/review-hooks';
+import { useDailyLearningPlanQuery, useReviewForecastQuery } from '@/features/home/home-hooks';
 import { useAppTheme } from '@/lib/theme-provider';
 
 type QuickActionProps = {
@@ -31,33 +30,43 @@ type ProgressStatProps = {
   icon: ReactNode;
 };
 
+type ForecastStatProps = {
+  label: string;
+  value: number | string;
+  icon: ReactNode;
+};
+
 export default function HomeScreen() {
-  const stats = useHomeStatsQuery();
-  const newWords = useNewWordsQuery(undefined, 5);
-  const weakWords = useWeakWordsQuery();
+  const plan = useDailyLearningPlanQuery();
+  const forecast = useReviewForecastQuery();
   const { colors } = useAppTheme();
-  const dueCount = stats.data?.dueCount ?? 0;
-  const newCount = newWords.data?.length ?? 0;
-  const weakCount = weakWords.data?.length ?? 0;
-  const reviewedToday = stats.data?.reviewedToday ?? 0;
-  const remainingToday = dueCount + newCount + weakCount;
-  const totalToday = reviewedToday + remainingToday;
-  const progress = totalToday === 0 ? 0 : reviewedToday / totalToday;
-  const progressText = totalToday === 0 ? 'Clear' : `${reviewedToday}/${totalToday}`;
-  const username = stats.data?.username ?? 'Learner';
-  const planIsLoading = stats.isLoading || newWords.isLoading || weakWords.isLoading;
-  const planHasError = stats.isError || newWords.isError || weakWords.isError;
+  const dueCount = plan.data?.due_count ?? 0;
+  const newCount = plan.data?.available_new_words ?? 0;
+  const weakCount = plan.data?.available_weak_words ?? 0;
+  const forecastRows = forecast.data ?? [];
+  const forecastTotal = forecastRows.reduce((total, row) => total + row.review_count, 0);
+  const forecastToday = forecastRows.find((row) => row.period === 'today')?.review_count ?? (forecast.isLoading ? '...' : 0);
+  const forecastTomorrow = forecastRows.find((row) => row.period === 'tomorrow')?.review_count ?? (forecast.isLoading ? '...' : 0);
+  const forecastNextSeven = forecastRows.find((row) => row.period === 'next_7_days')?.review_count ?? (forecast.isLoading ? '...' : 0);
+  const reviewedToday = plan.data?.reviewed_today ?? 0;
+  const dailyReviewTarget = plan.data?.daily_review_target ?? 0;
+  const remainingToday = plan.data?.remaining_today ?? 0;
+  const progress = (plan.data?.completion_percent ?? 0) / 100;
+  const progressText = plan.data ? `${reviewedToday}/${dailyReviewTarget}` : 'Loading';
+  const username = plan.data?.username ?? 'Learner';
+  const planIsLoading = plan.isLoading;
+  const planHasError = plan.isError;
   const reviewTitle = planIsLoading
     ? 'Loading today plan'
     : remainingToday > 0
       ? `${remainingToday} ${remainingToday === 1 ? 'task' : 'tasks'} in today's plan`
       : 'All caught up';
   const primaryAction: { href: ReviewSessionHref; label: string } | null =
-    dueCount > 0
+    plan.data?.next_recommended_action === 'review_due'
       ? { href: '/(protected)/review/session', label: 'Start Review' }
-      : newCount > 0
+      : plan.data?.next_recommended_action === 'learn_new'
         ? { href: '/(protected)/review/session?mode=new', label: 'Learn New' }
-        : weakCount > 0
+        : plan.data?.next_recommended_action === 'practice_weak'
           ? { href: '/(protected)/review/session?mode=weak', label: 'Weak Review' }
           : null;
 
@@ -156,13 +165,44 @@ export default function HomeScreen() {
             />
             <PlanTask
               title="Weak Review"
-              subtitle={weakCount > 0 ? `${weakCount} weak words are due now` : 'No weak words due now'}
+              subtitle={weakCount > 0 ? `${weakCount} weak words to practice` : 'No weak words to practice'}
               status={weakCount > 0 ? 'Ready' : 'Done'}
               href="/(protected)/review/session?mode=weak"
               disabled={planHasError || weakCount === 0}
               icon={<RotateCcw color={colors.warning} size={18} strokeWidth={2.4} />}
             />
           </View>
+        </View>
+
+        <View>
+          <View className="flex-row items-center justify-between">
+            <AppText className="text-lg font-semibold leading-6" style={{ color: colors.text }}>
+              Upcoming Reviews
+            </AppText>
+            <AppText className="text-sm leading-5" style={{ color: colors.muted }}>
+              {forecast.isLoading ? 'Loading' : forecast.isError ? 'Unavailable' : forecastTotal === 0 ? 'All clear' : `${forecastTotal} scheduled`}
+            </AppText>
+          </View>
+          {forecast.isError ? (
+            <View className="mt-4 min-h-[74px] justify-center rounded-xl border px-4 py-3" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+              <AppText className="text-sm leading-5" style={{ color: colors.muted }}>
+                Could not load review forecast.
+              </AppText>
+            </View>
+          ) : (
+            <>
+              <View className="mt-4 flex-row gap-3">
+                <ForecastStat label="Today" value={forecastToday} icon={<CalendarDays color={colors.primary} size={18} strokeWidth={2.4} />} />
+                <ForecastStat label="Tomorrow" value={forecastTomorrow} icon={<CalendarDays color={colors.warning} size={18} strokeWidth={2.4} />} />
+                <ForecastStat label="Next 7 Days" value={forecastNextSeven} icon={<CalendarDays color={colors.success} size={18} strokeWidth={2.4} />} />
+              </View>
+              {!forecast.isLoading && forecastTotal === 0 ? (
+                <AppText className="mt-3 text-sm leading-5" style={{ color: colors.muted }}>
+                  No upcoming reviews scheduled.
+                </AppText>
+              ) : null}
+            </>
+          )}
         </View>
 
         <View className="flex-row gap-4">
@@ -193,17 +233,17 @@ export default function HomeScreen() {
           <View className="mt-4 flex-row gap-3">
             <ProgressStat
               label="Days Streak"
-              value={stats.data?.currentStreak ?? '-'}
+              value={plan.data?.current_streak ?? '-'}
               icon={<Flame color={colors.warning} size={18} fill={colors.warning} />}
             />
             <ProgressStat
               label="Total Words"
-              value={stats.data?.totalWords ?? '-'}
+              value={plan.data?.total_words ?? '-'}
               icon={<BookOpen color={colors.primary} size={20} strokeWidth={2.3} />}
             />
             <ProgressStat
               label="Mastered"
-              value={stats.data?.masteredWords ?? '-'}
+              value={plan.data?.mastered_words ?? '-'}
               icon={<Trophy color={colors.success} size={21} strokeWidth={2.3} />}
             />
           </View>
@@ -281,6 +321,22 @@ function ProgressStat({ label, value, icon }: ProgressStatProps) {
         {value}
       </AppText>
       <AppText className="mt-1 text-center text-[13px] leading-[18px]" style={{ color: colors.muted }}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+function ForecastStat({ label, value, icon }: ForecastStatProps) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View className="min-h-[94px] flex-1 items-center justify-center rounded-xl border p-3 shadow-sm" style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+      <View className="mb-1 h-6 items-center justify-center">{icon}</View>
+      <AppText className="text-center text-2xl font-bold leading-8" style={{ color: colors.text }}>
+        {value}
+      </AppText>
+      <AppText numberOfLines={2} className="mt-1 text-center text-[12px] leading-4" style={{ color: colors.muted }}>
         {label}
       </AppText>
     </View>
