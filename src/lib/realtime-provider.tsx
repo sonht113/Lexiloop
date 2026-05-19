@@ -37,6 +37,12 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reminder_settings', filter: userFilter }, () => {
         queryClient.invalidateQueries({ queryKey: ['reminder-settings'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'learning_settings', filter: userFilter }, () => {
+        queryClient.invalidateQueries({ queryKey: ['learning-settings'] });
+        queryClient.invalidateQueries({ queryKey: ['review'] });
+        queryClient.invalidateQueries({ queryKey: ['home'] });
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+      })
       .subscribe();
 
     return () => {

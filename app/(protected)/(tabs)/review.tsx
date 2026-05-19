@@ -4,6 +4,7 @@ import { BookOpen, ClipboardCheck, Flame, Layers3, RotateCcw, Target } from 'luc
 import { Pressable, ScrollView, View } from 'react-native';
 import { AppText, EmptyState, Screen } from '@/components/ui';
 import { useHomeStatsQuery } from '@/features/home/home-hooks';
+import { DEFAULT_LEARNING_SETTINGS, useLearningSettingsQuery } from '@/features/learning-settings/learning-settings-hooks';
 import { useDueWordsQuery, useNewWordsQuery, useWeakWordsQuery } from '@/features/review/review-hooks';
 import { useAppTheme } from '@/lib/theme-provider';
 
@@ -100,8 +101,11 @@ function Metric({ label, value, icon }: MetricProps) {
 
 export default function ReviewLandingScreen() {
   const dueWords = useDueWordsQuery();
-  const newWords = useNewWordsQuery(undefined, 5);
-  const weakWords = useWeakWordsQuery();
+  const learningSettings = useLearningSettingsQuery();
+  const dailyNewWordsLimit = learningSettings.data?.daily_new_words_limit ?? DEFAULT_LEARNING_SETTINGS.daily_new_words_limit;
+  const dailyWeakWordsLimit = learningSettings.data?.daily_weak_words_limit ?? DEFAULT_LEARNING_SETTINGS.daily_weak_words_limit;
+  const newWords = useNewWordsQuery(undefined, dailyNewWordsLimit);
+  const weakWords = useWeakWordsQuery(undefined, dailyWeakWordsLimit);
   const stats = useHomeStatsQuery();
   const { colors } = useAppTheme();
   const dueCount = dueWords.data?.length ?? stats.data?.dueCount ?? 0;
@@ -110,8 +114,8 @@ export default function ReviewLandingScreen() {
   const totalWords = stats.data?.totalWords ?? 0;
   const reviewedToday = stats.data?.reviewedToday ?? 0;
   const planQueue = dueCount + newCount + weakCount;
-  const planIsLoading = dueWords.isLoading || newWords.isLoading || weakWords.isLoading || stats.isLoading;
-  const planHasError = dueWords.isError || newWords.isError || weakWords.isError || stats.isError;
+  const planIsLoading = dueWords.isLoading || learningSettings.isLoading || newWords.isLoading || weakWords.isLoading || stats.isLoading;
+  const planHasError = dueWords.isError || learningSettings.isError || newWords.isError || weakWords.isError || stats.isError;
   const accuracyLabel = stats.data?.accuracy == null ? '-' : `${stats.data.accuracy}%`;
   const streakLabel = stats.data?.currentStreak ?? '-';
   const recommendation =
@@ -132,7 +136,7 @@ export default function ReviewLandingScreen() {
         : weakCount > 0
           ? {
               title: 'Start weak review',
-              subtitle: `${weakCount} weak ${weakCount === 1 ? 'word is' : 'words are'} due for reinforcement.`,
+              subtitle: `${weakCount} weak ${weakCount === 1 ? 'word is' : 'words are'} ready for reinforcement.`,
               href: '/(protected)/review/session?mode=weak' as const,
               label: 'Weak Review',
             }
@@ -228,7 +232,7 @@ export default function ReviewLandingScreen() {
             />
             <ReviewActionCard
               title="Weak Review"
-              subtitle="Reschedule weak words by how well you remember them."
+              subtitle="Practice weak words without changing due dates."
               count={planIsLoading ? '-' : String(weakCount)}
               status={weakCount > 0 ? 'Ready' : 'Clear'}
               href="/(protected)/review/session?mode=weak"

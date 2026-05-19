@@ -28,6 +28,10 @@ import {
 import { AppText, Screen, useAppAlert } from "@/components/ui";
 import { useSignOutMutation } from "@/features/auth/auth-hooks";
 import {
+  DEFAULT_LEARNING_SETTINGS,
+  useLearningSettingsQuery,
+} from "@/features/learning-settings/learning-settings-hooks";
+import {
   getProfileAvatarPublicUrl,
   useExportProfileDataMutation,
   useProfileStatsQuery,
@@ -100,6 +104,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const stats = useProfileStatsQuery();
   const reminder = useReminderSettingsQuery();
+  const learningSettings = useLearningSettingsQuery();
   const signOut = useSignOutMutation();
   const exportData = useExportProfileDataMutation();
   const uploadAvatar = useUploadProfileAvatarMutation();
@@ -121,6 +126,9 @@ export default function ProfileScreen() {
     reminder.data?.enabled,
     reminderSyncResult,
   );
+  const dailyGoalsSubtitle = learningSettings.isLoading
+    ? "Loading your daily pace"
+    : `${learningSettings.data?.daily_new_words_limit ?? DEFAULT_LEARNING_SETTINGS.daily_new_words_limit} new / ${learningSettings.data?.daily_weak_words_limit ?? DEFAULT_LEARNING_SETTINGS.daily_weak_words_limit} weak / ${learningSettings.data?.daily_review_target ?? DEFAULT_LEARNING_SETTINGS.daily_review_target} reviews`;
 
   useEffect(() => {
     let isMounted = true;
@@ -434,6 +442,13 @@ export default function ProfileScreen() {
             subtitle={reminderSubtitle}
             icon={Bell}
             onPress={() => router.push("/(protected)/reminder")}
+          />
+          <View className="h-px" style={{ backgroundColor: colors.border }} />
+          <SettingsRow
+            title="Daily Goals"
+            subtitle={dailyGoalsSubtitle}
+            icon={Target}
+            onPress={() => router.push("/(protected)/learning-goals" as never)}
           />
           <View className="h-px" style={{ backgroundColor: colors.border }} />
           <SettingsRow

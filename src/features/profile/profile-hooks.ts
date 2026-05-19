@@ -174,17 +174,19 @@ export function useExportProfileDataMutation() {
   return useMutation({
     mutationFn: async () => {
       const profile = await ensureUserBootstrap();
-      const [profileResult, decks, words, wordExamples, reviewLogs, reminderResult] = await Promise.all([
+      const [profileResult, decks, words, wordExamples, reviewLogs, reminderResult, learningSettingsResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', profile.id).single(),
         fetchPaged<Deck>((from, to) => supabase.from('decks').select('*').order('created_at', { ascending: true }).range(from, to)),
         fetchPaged<Word>((from, to) => supabase.from('words').select('*').order('created_at', { ascending: true }).range(from, to)),
         fetchPaged<WordExample>((from, to) => supabase.from('word_examples').select('*').order('sort_order', { ascending: true }).range(from, to)),
         fetchPaged<ReviewLog>((from, to) => supabase.from('review_logs').select('*').order('reviewed_at', { ascending: true }).range(from, to)),
         supabase.from('reminder_settings').select('*').maybeSingle(),
+        supabase.from('learning_settings').select('*').maybeSingle(),
       ]);
 
       if (profileResult.error) throw profileResult.error;
       if (reminderResult.error) throw reminderResult.error;
+      if (learningSettingsResult.error) throw learningSettingsResult.error;
 
       const exportedAt = new Date().toISOString();
       const filename = `lexiloop-export-${exportedAt.replace(/[:.]/g, '-')}.json`;
@@ -205,6 +207,7 @@ export function useExportProfileDataMutation() {
           wordExamples,
           reviewLogs,
           reminderSettings: reminderResult.data,
+          learningSettings: learningSettingsResult.data,
         },
       };
       const text = JSON.stringify(payload, null, 2);

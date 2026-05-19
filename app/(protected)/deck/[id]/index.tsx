@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { AppText, EmptyState, Screen } from '@/components/ui';
 import { useDeckQuery, useDecksQuery } from '@/features/decks/deck-hooks';
+import { DEFAULT_LEARNING_SETTINGS, useLearningSettingsQuery } from '@/features/learning-settings/learning-settings-hooks';
 import { useDueWordsQuery, useWeakWordsQuery } from '@/features/review/review-hooks';
 import { getWordStatus, isLearningWordStatus, WordCard } from '@/features/words/word-card';
 import { WordForm } from '@/features/words/word-form';
@@ -56,7 +57,9 @@ export default function DeckDetailScreen() {
   const decks = useDecksQuery();
   const words = useWordsQuery(id);
   const dueWords = useDueWordsQuery(id);
-  const weakWords = useWeakWordsQuery(id);
+  const learningSettings = useLearningSettingsQuery();
+  const dailyWeakWordsLimit = learningSettings.data?.daily_weak_words_limit ?? DEFAULT_LEARNING_SETTINGS.daily_weak_words_limit;
+  const weakWords = useWeakWordsQuery(id, dailyWeakWordsLimit);
   const [showAddWord, setShowAddWord] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
@@ -143,7 +146,7 @@ export default function DeckDetailScreen() {
               >
                 <RotateCcw color={colors.warning} size={15} />
                 <AppText className="text-base font-medium leading-6" style={{ color: colors.warning }}>
-                  {weakCount > 0 ? `Weak Review (${weakCount})` : 'No weak words due'}
+                  {weakCount > 0 ? `Weak Review (${weakCount})` : 'No weak words to practice'}
                 </AppText>
               </Pressable>
             </Link>
