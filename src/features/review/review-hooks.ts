@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { AnswerWordReviewResponse, Database, ReviewResult } from '@/types/database';
+import type { AnswerWordReviewResponse, Database, ReviewResult, WeakWordRow } from '@/types/database';
 
 type Deck = Pick<Database['public']['Tables']['decks']['Row'], 'id' | 'name' | 'color' | 'icon'>;
 type Word = Database['public']['Tables']['words']['Row'];
@@ -9,7 +9,18 @@ type WordExample = Database['public']['Tables']['word_examples']['Row'];
 export type ReviewWord = Word & {
   decks: Deck | null;
   word_examples?: WordExample[];
+  weak_score?: number;
 };
+
+function mapWeakWordRow(row: WeakWordRow): ReviewWord {
+  const { decks, word_examples, weak_score, ...word } = row;
+  return {
+    ...word,
+    weak_score,
+    decks: decks as Deck | null,
+    word_examples: Array.isArray(word_examples) ? (word_examples as WordExample[]) : [],
+  };
+}
 
 export function useDueWordsQuery(deckId?: string, enabled = true) {
   return useQuery({
@@ -52,27 +63,17 @@ export function usePracticeWordsQuery(deckId?: string, enabled = true) {
   });
 }
 
-export function useWeakWordsQuery(deckId?: string, enabled = true) {
+export function useWeakWordsQuery(deckId?: string, limit = 10, enabled = true) {
   return useQuery({
-    queryKey: ['review', 'weak-words', deckId ?? 'all'],
+    queryKey: ['review', 'weak-words', deckId ?? 'all', limit],
     enabled,
     queryFn: async () => {
-      let query = supabase
-        .from('words')
-        .select('*, decks(id, name, color, icon), word_examples(*)')
-        .gt('review_count', 0)
-        .gt('forgot_count', 0)
-        .lte('due_at', new Date().toISOString())
-        .order('forgot_count', { ascending: false })
-        .order('correct_streak', { ascending: true })
-        .order('due_at', { ascending: true })
-        .order('sort_order', { referencedTable: 'word_examples', ascending: true });
-
-      if (deckId) query = query.eq('deck_id', deckId);
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('get_weak_words', {
+        p_limit: limit,
+        p_deck_id: deckId ?? null,
+      });
       if (error) throw error;
-      return data as ReviewWord[];
+      return (data as WeakWordRow[]).map(mapWeakWordRow);
     },
   });
 }
