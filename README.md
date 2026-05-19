@@ -20,6 +20,7 @@ Add words -> Learn new words -> Review due words -> Practice weak words -> Repea
 - Deck detail stats, filtering, practice actions, and next review metadata on word cards.
 - Aggregate leaderboard by mastered words and words added.
 - Daily reminder settings with local notifications and Android exact alarm support.
+- Server-backed reminder push path through Supabase Edge Functions and Expo push tokens.
 - Profile stats, avatar upload, theme switch, and JSON data export.
 
 ## Stack
@@ -65,6 +66,7 @@ Notes:
 
 - Android reminder accuracy requires a preview/custom build, not Expo Go.
 - Users must allow notification permission and Android "Alarms & reminders" permission for exact reminder timing.
+- Server reminders require deploying `supabase/functions/send-reminders`, setting the `REMINDER_CRON_SECRET` Edge Function secret, storing `EXPO_PUBLIC_SUPABASE_URL`, `SUPABASE_LEGACY_ANON_KEY`, and `REMINDER_CRON_SECRET` in Supabase Vault, then running `select private.schedule_reminder_push_cron();` after migrations.
 - iOS builds require an Apple Developer Program account when distributing through App Store/TestFlight.
 
 ## Scripts
@@ -90,6 +92,8 @@ Required:
 ```txt
 EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
+REMINDER_CRON_SECRET=
+SUPABASE_LEGACY_ANON_KEY=
 ```
 
 ## Source layout
