@@ -10,6 +10,7 @@ import {
   scheduleLexiLoopReminder,
   type ReminderSyncResult,
 } from '@/features/reminder/notification-service';
+import { registerReminderPushToken } from '@/features/reminder/push-token-service';
 import { useReminderSettingsQuery, useUpdateReminderSettingsMutation } from '@/features/reminder/reminder-hooks';
 import { useAppTheme } from '@/lib/theme-provider';
 
@@ -29,6 +30,12 @@ const repeatDays = [
   { label: 'F', value: 5 },
   { label: 'S', value: 6 },
 ];
+
+function getReminderWarningTitle(syncResult?: ReminderSyncResult | null) {
+  if (syncResult?.status === 'exact-alarm-denied') return 'Exact alarm required';
+  if (syncResult?.status === 'channel-disabled') return 'Reminder channel disabled';
+  return 'Notifications disabled';
+}
 
 function parseStoredTime(value: string) {
   const [hourText, minuteText] = value.slice(0, 5).split(':');
@@ -253,6 +260,9 @@ export default function ReminderScreen() {
         });
         syncResult = scheduled;
         setLastSyncResult(scheduled);
+        if (scheduled.status === 'scheduled') {
+          await registerReminderPushToken({ requestPermission: false });
+        }
       } else {
         const canceled = await cancelLexiLoopReminders();
         syncResult = canceled;
@@ -261,7 +271,7 @@ export default function ReminderScreen() {
 
       if (enabled && syncResult?.status !== 'scheduled') {
         appAlert.show({
-          title: syncResult?.status === 'exact-alarm-denied' ? 'Exact alarm required' : 'Notifications disabled',
+          title: getReminderWarningTitle(syncResult),
           message: syncResult?.message ?? 'Reminder settings were saved, but notifications could not be scheduled.',
           variant: 'warning',
         });

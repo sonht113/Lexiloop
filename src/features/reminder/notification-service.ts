@@ -16,6 +16,7 @@ export type ReminderSyncStatus =
   | 'unsupported'
   | 'permission-denied'
   | 'exact-alarm-denied'
+  | 'channel-disabled'
   | 'invalid-input'
   | 'failed';
 
@@ -24,6 +25,17 @@ export type ReminderSyncResult = {
   message: string;
   scheduledCount?: number;
   nextTriggerDates?: string[];
+};
+
+export type ReminderDiagnostics = {
+  notificationsSupported: boolean;
+  permissionGranted: boolean;
+  exactReminderAccess: Awaited<ReturnType<typeof getExactReminderAccess>>;
+  channelEnabled: boolean | null;
+  channelImportance: number | null;
+  storedNotificationIds: string[];
+  activeStoredNotificationIds: string[];
+  scheduledNotificationCount: number;
 };
 
 function createReminderSyncResult(status: ReminderSyncStatus, message: string, scheduledCount?: number, nextTriggerDates?: string[]): ReminderSyncResult {
@@ -138,7 +150,7 @@ async function getActiveStoredReminderNotificationIds(Notifications: Notificatio
 }
 
 async function ensureReminderChannel(Notifications: NotificationsModule) {
-  if (Platform.OS !== 'android') return;
+  if (Platform.OS !== 'android') return true;
 
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
     name: 'LexiLoop reminders',
@@ -146,6 +158,45 @@ async function ensureReminderChannel(Notifications: NotificationsModule) {
     sound: 'default',
     enableVibrate: true,
   });
+
+  const channel = await Notifications.getNotificationChannelAsync(REMINDER_CHANNEL_ID);
+  return !channel || channel.importance > Notifications.AndroidImportance.NONE;
+}
+
+export async function getReminderDiagnostics(): Promise<ReminderDiagnostics> {
+  const Notifications = await getNotificationsModule();
+  const exactReminderAccess = await getExactReminderAccess();
+  const storedNotificationIds = await getStoredReminderNotificationIds();
+
+  if (!Notifications) {
+    return {
+      notificationsSupported: false,
+      permissionGranted: false,
+      exactReminderAccess,
+      channelEnabled: null,
+      channelImportance: null,
+      storedNotificationIds,
+      activeStoredNotificationIds: [],
+      scheduledNotificationCount: 0,
+    };
+  }
+
+  const permission = await Notifications.getPermissionsAsync();
+  const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduledIds = new Set(scheduledNotifications.map((notification) => notification.identifier));
+  const activeStoredNotificationIds = storedNotificationIds.filter((id) => scheduledIds.has(id));
+  const channel = Platform.OS === 'android' ? await Notifications.getNotificationChannelAsync(REMINDER_CHANNEL_ID) : null;
+
+  return {
+    notificationsSupported: true,
+    permissionGranted: permission.granted,
+    exactReminderAccess,
+    channelEnabled: Platform.OS === 'android' ? Boolean(channel && channel.importance > Notifications.AndroidImportance.NONE) : null,
+    channelImportance: channel?.importance ?? null,
+    storedNotificationIds,
+    activeStoredNotificationIds,
+    scheduledNotificationCount: scheduledNotifications.length,
+  };
 }
 
 export async function requestReminderPermission() {
@@ -235,7 +286,12 @@ export async function scheduleLexiLoopReminder(
     }
 
     await cancelLexiLoopReminders();
-    await ensureReminderChannel(Notifications);
+    const channelEnabled = await ensureReminderChannel(Notifications);
+    if (!channelEnabled) {
+      const result = createReminderSyncResult('channel-disabled', 'Enable the LexiLoop reminders notification channel in Android Settings.');
+      await setLastReminderSyncResult(result);
+      return result;
+    }
 
     const notificationIds: string[] = [];
     const nextTriggerDates: string[] = [];
@@ -309,8 +365,11 @@ export async function syncLexiLoopReminder(input: { enabled: boolean; time: stri
     const Notifications = await getNotificationsModule();
     const exactReminderAccess = await getExactReminderAccess();
     if (Notifications && exactReminderAccess === 'granted') {
+      const permission = await Notifications.getPermissionsAsync();
+      const channel = Platform.OS === 'android' ? await Notifications.getNotificationChannelAsync(REMINDER_CHANNEL_ID) : null;
+      const channelEnabled = Platform.OS !== 'android' || Boolean(channel && channel.importance > Notifications.AndroidImportance.NONE);
       const activeStoredIds = await getActiveStoredReminderNotificationIds(Notifications);
-      if (activeStoredIds.length === storedNotificationIds.length) {
+      if (permission.granted && channelEnabled && activeStoredIds.length === storedNotificationIds.length) {
         const result = await getLastReminderSyncResult();
         if (result?.status === 'scheduled') return result;
       }

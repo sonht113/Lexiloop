@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { disableReminderPushTokens } from '@/features/reminder/push-token-service';
 import { supabase } from '@/lib/supabase';
 import { usernameToInternalEmail } from './auth-utils';
 
@@ -53,6 +54,7 @@ export function useSignOutMutation() {
 
   return useMutation({
     mutationFn: async () => {
+      await disableReminderPushTokens();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
