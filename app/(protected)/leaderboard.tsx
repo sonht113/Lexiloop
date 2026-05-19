@@ -6,11 +6,17 @@ import { AppText, EmptyState, Screen } from '@/components/ui';
 import { getProfileAvatarPublicUrl } from '@/features/profile/profile-hooks';
 import { useLeaderboardQuery, type LeaderboardRow } from '@/features/leaderboard/leaderboard-hooks';
 import { useAppTheme } from '@/lib/theme-provider';
-import type { LeaderboardMetric } from '@/types/database';
+import type { LeaderboardMetric, LeaderboardPeriod } from '@/types/database';
 
 const metricOptions: { label: string; value: LeaderboardMetric }[] = [
   { label: 'Mastered', value: 'mastered' },
   { label: 'Words Added', value: 'words' },
+];
+
+const periodOptions: { label: string; value: LeaderboardPeriod }[] = [
+  { label: 'All time', value: 'all_time' },
+  { label: 'Week', value: 'week' },
+  { label: 'Month', value: 'month' },
 ];
 
 function getRankTone(rank: number, colors: ReturnType<typeof useAppTheme>['colors']) {
@@ -18,6 +24,32 @@ function getRankTone(rank: number, colors: ReturnType<typeof useAppTheme>['color
   if (rank === 2) return colors.muted;
   if (rank === 3) return colors.primary;
   return colors.text;
+}
+
+function PeriodSwitch({ value, onChange }: { value: LeaderboardPeriod; onChange: (value: LeaderboardPeriod) => void }) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View className="flex-row rounded-xl p-1" style={{ backgroundColor: colors.primarySoft }}>
+      {periodOptions.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            className="min-h-10 flex-1 items-center justify-center rounded-lg px-3"
+            style={{ backgroundColor: selected ? colors.primary : 'transparent' }}
+            onPress={() => onChange(option.value)}
+          >
+            <AppText numberOfLines={1} className="text-sm font-semibold leading-5" style={{ color: selected ? '#ffffff' : colors.primary }}>
+              {option.label}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 function MetricSwitch({ value, onChange }: { value: LeaderboardMetric; onChange: (value: LeaderboardMetric) => void }) {
@@ -46,12 +78,16 @@ function MetricSwitch({ value, onChange }: { value: LeaderboardMetric; onChange:
   );
 }
 
-function LeaderboardItem({ row, metric }: { row: LeaderboardRow; metric: LeaderboardMetric }) {
+function LeaderboardItem({ row, metric, period }: { row: LeaderboardRow; metric: LeaderboardMetric; period: LeaderboardPeriod }) {
   const { colors } = useAppTheme();
   const avatarUrl = getProfileAvatarPublicUrl(row.avatar_url);
   const rankColor = getRankTone(row.rank, colors);
-  const primaryValue = metric === 'mastered' ? row.mastered_words : row.total_words;
-  const primaryLabel = metric === 'mastered' ? 'mastered' : 'words';
+  const isPeriodRanking = period !== 'all_time';
+  const primaryValue = isPeriodRanking ? row.period_reviews : metric === 'mastered' ? row.mastered_words : row.total_words;
+  const primaryLabel = isPeriodRanking ? (period === 'week' ? 'this week' : 'this month') : metric === 'mastered' ? 'mastered' : 'words';
+  const subtitle = isPeriodRanking
+    ? `${row.period_reviews} reviews ${period === 'week' ? 'this week' : 'this month'} | ${row.current_streak} streak`
+    : `${row.mastered_words} mastered | ${row.total_words} words | ${row.current_streak} streak`;
 
   return (
     <View
@@ -88,7 +124,7 @@ function LeaderboardItem({ row, metric }: { row: LeaderboardRow; metric: Leaderb
           ) : null}
         </View>
         <AppText className="text-sm leading-5" style={{ color: colors.muted }}>
-          {row.mastered_words} mastered | {row.total_words} words | {row.current_streak} streak
+          {subtitle}
         </AppText>
       </View>
       <View className="items-end">
@@ -107,7 +143,8 @@ export default function LeaderboardScreen() {
   const router = useRouter();
   const { colors } = useAppTheme();
   const [metric, setMetric] = useState<LeaderboardMetric>('mastered');
-  const leaderboard = useLeaderboardQuery(metric, 50);
+  const [period, setPeriod] = useState<LeaderboardPeriod>('all_time');
+  const leaderboard = useLeaderboardQuery(metric, period, 50);
   const rows = leaderboard.data ?? [];
 
   return (
@@ -146,8 +183,13 @@ export default function LeaderboardScreen() {
             </View>
           </View>
           <View className="mt-4">
-            <MetricSwitch value={metric} onChange={setMetric} />
+            <PeriodSwitch value={period} onChange={setPeriod} />
           </View>
+          {period === 'all_time' ? (
+            <View className="mt-3">
+              <MetricSwitch value={metric} onChange={setMetric} />
+            </View>
+          ) : null}
         </View>
 
         {leaderboard.isLoading ? <AppText style={{ color: colors.muted }}>Loading leaderboard...</AppText> : null}
@@ -156,7 +198,7 @@ export default function LeaderboardScreen() {
           <EmptyState title="No rankings yet" description="Add and review words to appear here." />
         ) : null}
         <View className="gap-3">
-          {rows.map((row) => <LeaderboardItem key={row.user_id} row={row} metric={metric} />)}
+          {rows.map((row) => <LeaderboardItem key={row.user_id} row={row} metric={metric} period={period} />)}
         </View>
       </ScrollView>
     </Screen>
