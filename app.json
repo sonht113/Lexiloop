@@ -23,7 +23,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow LexiLoop to access your photos so you can choose a profile avatar."
+          "cameraPermission": "Allow LexiLoop to access your camera so you can scan vocabulary from photos.",
+          "photosPermission": "Allow LexiLoop to access your photos so you can scan vocabulary from images."
         }
       ]
     ],
