@@ -193,6 +193,7 @@ export default function DeckDetailScreen() {
         scanStore.setStatus("reviewing");
         router.push("/scan/review" as any);
       } catch (error) {
+        console.error("[Scan] Error in handleImageSelected:", error);
         if (error && typeof error === "object" && "code" in error) {
           const scanError = error as {
             code: string;
