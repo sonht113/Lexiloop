@@ -9,7 +9,7 @@ import type {
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 const SCAN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/scan-vocabulary`;
-const SCAN_TIMEOUT_MS = 30_000;
+const SCAN_TIMEOUT_MS = 60_000;
 
 async function getAccessToken(): Promise<string> {
   const {
